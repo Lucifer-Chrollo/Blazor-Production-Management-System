@@ -1,0 +1,27 @@
+@page "/migration"
+@using InventoryManagementSystem.Services
+@using Microsoft.Data.SqlClient
+@inject DatabaseService DB
+@inject IConfiguration Config
+@inject IWorkOrderService WorkOrderService
+
+<h3>Running Migration...</h3>
+<p>@status</p>
+
+@code {
+    string status = "Starting...";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            status = "Recalculating Historical Costs based on Production...";
+            await WorkOrderService.RecalculateHistoricalCostsAsync();
+            status = "Migration Successful! All manufactured products have been updated with latest production costs.";
+        }
+        catch (Exception ex)
+        {
+            status = $"Error: {ex.Message}";
+        }
+    }
+}

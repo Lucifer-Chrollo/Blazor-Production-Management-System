@@ -1,0 +1,61 @@
+@using InventoryManagementSystem.Models
+@using InventoryManagementSystem.Services
+@using Radzen
+@using Radzen.Blazor
+
+@inject IStockTransactionService TransactionService
+@inject IProductService ProductService
+@inject DialogService DialogService
+
+<RadzenTemplateForm Data="@transaction" Submit="@((StockTransaction args) => OnSubmit(args))">
+    <RadzenStack Gap="1rem">
+        <RadzenFormField Text="Transaction Type" Variant="Variant.Outlined" Style="width: 100%">
+            <RadzenDropDown @bind-Value="@transaction.Type" Data="@(Enum.GetValues(typeof(TransactionType)))"
+                Name="Type" Style="width: 100%" />
+        </RadzenFormField>
+
+        <RadzenFormField Text="Product" Variant="Variant.Outlined" Style="width: 100%">
+            <RadzenDropDown @bind-Value="@transaction.ProductId" Data="@products" TextProperty="Name"
+                ValueProperty="ProductId" Name="Product" Style="width: 100%"
+                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                FilterOperator="StringFilterOperator.Contains" AllowFiltering="true" />
+        </RadzenFormField>
+        <RadzenRequiredValidator Component="Product" Text="Product is required" DefaultValue="0" />
+
+        <RadzenFormField Text="Quantity" Variant="Variant.Outlined" Style="width: 100%">
+            <RadzenNumeric @bind-Value="@transaction.Quantity" Name="Quantity" Min="1" Style="width: 100%" />
+        </RadzenFormField>
+        <RadzenRequiredValidator Component="Quantity" Text="Quantity is required" DefaultValue="0" />
+
+        <RadzenFormField Text="Reference" Variant="Variant.Outlined" Style="width: 100%">
+            <RadzenTextBox @bind-Value="@transaction.Reference" Style="width: 100%" />
+        </RadzenFormField>
+
+        <RadzenFormField Text="Notes" Variant="Variant.Outlined" Style="width: 100%">
+            <RadzenTextArea @bind-Value="@transaction.Notes" Rows="3" Style="width: 100%" />
+        </RadzenFormField>
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" Class="mt-2">
+            <RadzenButton ButtonType="ButtonType.Submit" Text="Save" Icon="save" ButtonStyle="ButtonStyle.Primary" />
+            <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(false))" ButtonStyle="ButtonStyle.Light" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    StockTransaction transaction = new StockTransaction { TransactionDate = DateTime.Now };
+    List<Product> products = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await ProductService.GetAllProductsAsync();
+    }
+
+    async Task OnSubmit(StockTransaction args)
+    {
+        if (transaction.ProductId == 0) return;
+
+        await TransactionService.AddTransactionAsync(transaction);
+        DialogService.Close(true);
+    }
+}

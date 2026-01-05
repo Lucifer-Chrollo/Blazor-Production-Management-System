@@ -1,0 +1,35 @@
+﻿@inherits LayoutComponentBase
+@using Radzen.Blazor
+
+<RadzenLayout>
+    <RadzenHeader>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0">
+            <RadzenSidebarToggle Click="@(() => sidebarExpanded = !sidebarExpanded)" />
+            <RadzenLabel Text="Inventory System" />
+        </RadzenStack>
+    </RadzenHeader>
+    <RadzenSidebar @bind-Expanded="@sidebarExpanded">
+        <NavMenu />
+    </RadzenSidebar>
+    <RadzenBody>
+        <div class="p-4">
+            @Body
+        </div>
+    </RadzenBody>
+    <RadzenFooter>
+        <RadzenText Text="Inventory Management System &copy; 2026" TextStyle="TextStyle.Caption"
+            TextAlign="TextAlign.Center" />
+    </RadzenFooter>
+</RadzenLayout>
+
+<RadzenComponents @rendermode="InteractiveServer" />
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    bool sidebarExpanded = true;
+}

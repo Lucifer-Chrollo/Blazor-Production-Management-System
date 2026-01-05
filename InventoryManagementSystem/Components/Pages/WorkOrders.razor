@@ -1,0 +1,135 @@
+﻿@page "/workorders"
+@using InventoryManagementSystem.Models
+@using InventoryManagementSystem.Services
+@using Radzen
+@using Radzen.Blazor
+
+@inject IWorkOrderService WorkOrderService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject NavigationManager NavigationManager
+
+<RadzenStack>
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="6">
+            <RadzenText TextStyle="TextStyle.H4" Text="Work Orders" />
+        </RadzenColumn>
+        <RadzenColumn Size="6" Class="rz-text-align-right">
+            <RadzenButton Icon="add" Text="Create Build Assembly" ButtonStyle="ButtonStyle.Primary"
+                Click="@(() => NavigationManager.NavigateTo("/build-assembly"))" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenDataGrid Data="@workOrders" TItem="WorkOrder" AllowFiltering="true" AllowPaging="true" AllowSorting="true"
+        PageSize="10" IsLoading="@isLoading">
+        <Columns>
+            <RadzenDataGridColumn TItem="WorkOrder" Property="OrderNumber" Title="Order #" Width="140px" />
+            <RadzenDataGridColumn TItem="WorkOrder" Property="Product.Name" Title="Product" />
+            <RadzenDataGridColumn TItem="WorkOrder" Property="QuantityOrdered" Title="Qty" Width="70px"
+                TextAlign="TextAlign.Center" />
+            <RadzenDataGridColumn TItem="WorkOrder" Property="TotalCost" Title="Cost" FormatString="{0:C}"
+                Width="100px" />
+            <RadzenDataGridColumn TItem="WorkOrder" Property="Status" Title="Status" Width="120px">
+                <Template Context="order">
+                    <RadzenBadge BadgeStyle="@GetStatusBadge(order.Status)" Text="@order.Status.ToString()" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="WorkOrder" Property="StartDate" Title="Date" FormatString="{0:d}"
+                Width="100px" />
+            <RadzenDataGridColumn TItem="WorkOrder" Title="Actions" Width="200px" Sortable="false" Filterable="false">
+                <Template Context="order">
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                        <RadzenButton Icon="visibility" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small"
+                            Click="@(() => NavigationManager.NavigateTo($"/build-assembly/{order.WorkOrderId}"))" />
+
+                        @if (order.Status == WorkOrderStatus.Pending)
+                        {
+                            <RadzenButton Text="Start" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small"
+                                Click="@(() => StartOrder(order))" />
+                        }
+                        @if (order.Status == WorkOrderStatus.InProgress)
+                        {
+                            <RadzenButton Text="Complete" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                                Click="@(() => CompleteOrder(order))" />
+                        }
+                    </RadzenStack>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenStack>
+
+@code {
+    List<WorkOrder> workOrders = new();
+    bool isLoading = true;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        // Simple timer to refresh in-progress orders?
+        // Radzen doesn't need manual timer for grid unless data changes.
+        // User's previous code had timer for "auto-complete" simulation or countdown. I'll omit simpler simulation for now
+        // unless requested.
+    }
+
+    async Task LoadData()
+    {
+        try
+        {
+            isLoading = true;
+            workOrders = await WorkOrderService.GetAllWorkOrdersAsync();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load work orders: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+
+
+    async Task StartOrder(WorkOrder order)
+    {
+        try
+        {
+            await WorkOrderService.StartWorkOrderAsync(order.WorkOrderId);
+            await LoadData();
+            NotificationService.Notify(NotificationSeverity.Info, "Started", $"Work Order {order.OrderNumber} started.");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to start order: {ex.Message}");
+        }
+    }
+
+    async Task CompleteOrder(WorkOrder order)
+    {
+        try
+        {
+            await WorkOrderService.CompleteWorkOrderAsync(order.WorkOrderId);
+            await LoadData();
+            NotificationService.Notify(NotificationSeverity.Success, "Completed", $"Work Order {order.OrderNumber} completed.");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+    }
+
+    BadgeStyle GetStatusBadge(WorkOrderStatus status)
+    {
+        return status switch
+        {
+            WorkOrderStatus.Pending => BadgeStyle.Warning,
+            WorkOrderStatus.InProgress => BadgeStyle.Primary,
+            WorkOrderStatus.Completed => BadgeStyle.Success,
+            WorkOrderStatus.Cancelled => BadgeStyle.Danger,
+            _ => BadgeStyle.Light
+        };
+    }
+}

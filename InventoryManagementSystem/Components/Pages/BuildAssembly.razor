@@ -1,0 +1,287 @@
+@page "/build-assembly"
+@page "/build-assembly/{WorkOrderId:int}"
+@using InventoryManagementSystem.Models
+@using InventoryManagementSystem.Services
+@using Radzen
+@using Radzen.Blazor
+
+@inject IWorkOrderService WorkOrderService
+@inject IProductService ProductService
+@inject IBillOfMaterialsService BOMService
+@inject NavigationManager NavigationManager
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<RadzenText TextStyle="TextStyle.H5" Style="font-weight: bold; margin-bottom: 20px;">Build Assembly</RadzenText>
+
+<RadzenTemplateForm Data="@workOrder" Submit="@((WorkOrder args) => OnSubmit(args))">
+    <RadzenCard Variant="Variant.Outlined" Class="rz-p-4" Style="background-color: var(--rz-base-background-color);">
+        <!-- Top Header Fields -->
+        <RadzenRow Gap="1rem" Class="mb-4">
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenLabel Text="Assembly Item" Component="ProductSearch" Style="display: block; margin-bottom: 4px; font-weight: bold;" />
+                 <RadzenAutoComplete Data="@productCandidates" TextProperty="Name" @bind-Value="@productSearch"
+                            LoadData="@OnProductSearch" Change="@(args => OnProductSelect())" Placeholder="Type to search..."
+                            Style="width: 100%" Name="ProductSearch"
+                            Disabled="@(isViewMode || workOrder.WorkOrderId > 0)" />
+                 <RadzenText TextStyle="TextStyle.Caption" Style="color: #888;">@(selectedProduct?.SKU ?? "")</RadzenText>
+            </RadzenColumn>
+            <RadzenColumn Size="6" SizeMD="2">
+                <RadzenLabel Text="Date" Component="StartDate" Style="display: block; margin-bottom: 4px; font-weight: bold;" />
+                <RadzenDatePicker @bind-Value="@workOrder.StartDate" Name="StartDate" Style="width: 100%" Disabled="@isViewMode" />
+            </RadzenColumn>
+             <RadzenColumn Size="6" SizeMD="2">
+                <RadzenLabel Text="Duration (Hours)" Component="Duration" Style="display: block; margin-bottom: 4px; font-weight: bold;" />
+                <RadzenNumeric @bind-Value="@durationHours" Name="Duration" Style="width: 100%" Disabled="@isViewMode" TValue="decimal" Min="0" />
+            </RadzenColumn>
+            <RadzenColumn Size="6" SizeMD="2">
+                <RadzenLabel Text="Build Ref. No." Component="RefNo" Style="display: block; margin-bottom: 4px; font-weight: bold;" />
+                <RadzenTextBox Value="@workOrder.OrderNumber" Name="RefNo" Style="width: 100%" ReadOnly="true" Placeholder="Auto" />
+            </RadzenColumn>
+             <RadzenColumn Size="6" SizeMD="2">
+                <RadzenLabel Text="Template" Component="Template" Style="display: block; margin-bottom: 4px; font-weight: bold;" />
+                <RadzenTextBox Value="Custom Build Assembly" Name="Template" Style="width: 100%; background-color: #e9ecef;" ReadOnly="true" />
+            </RadzenColumn>
+        </RadzenRow>
+
+        <!-- Stock Info Bar -->
+        <RadzenCard Variant="Variant.Flat" Class="mb-4 py-3" Style="background-color: #f8f9fa; border: 1px solid #dee2e6;">
+            <RadzenRow>
+                <RadzenColumn Size="3" Class="rz-text-align-center" Style="border-right: 1px solid #ddd;">
+                    <RadzenText TextStyle="TextStyle.Caption" Style="text-transform: uppercase;">Quantity on Hand</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Style="font-weight: bold;">@(selectedProduct?.Quantity ?? 0) ea</RadzenText>
+                </RadzenColumn>
+                 <RadzenColumn Size="3" Class="rz-text-align-center" Style="border-right: 1px solid #ddd;">
+                    <RadzenText TextStyle="TextStyle.Caption" Style="text-transform: uppercase;">Quantity on Sales Order</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Style="font-weight: bold;">0 ea</RadzenText>
+                </RadzenColumn>
+                 <RadzenColumn Size="3" Class="rz-text-align-center" Style="border-right: 1px solid #ddd;">
+                    <RadzenText TextStyle="TextStyle.Caption" Style="text-transform: uppercase;">Quantity Reserved</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Style="font-weight: bold;">0 ea</RadzenText>
+                </RadzenColumn>
+                 <RadzenColumn Size="3" Class="rz-text-align-center">
+                    <RadzenText TextStyle="TextStyle.Caption" Style="text-transform: uppercase;">Quantity Available</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Style="font-weight: bold; color: green;">@(selectedProduct?.Quantity ?? 0) ea</RadzenText>
+                </RadzenColumn>
+            </RadzenRow>
+        </RadzenCard>
+
+        <!-- Components Label -->
+         <RadzenText TextStyle="TextStyle.Subtitle2" Style="font-weight: bold; margin-bottom: 10px;">
+            Components Needed to Build @(selectedProduct?.Name ?? "Assembly")
+        </RadzenText>
+
+        <!-- Components Grid -->
+        <RadzenDataGrid Data="@orderComponents" TItem="WorkOrderDetailViewModel" AllowPaging="false" Density="Density.Compact" Class="mb-4" GridLines="DataGridGridLines.Both">
+            <Columns>
+                <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="ItemCode" Title="ITEM" Width="120px" />
+                <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="Description" Title="DESCRIPTION" />
+                <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="Type" Title="TYPE" Width="120px" />
+                <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="PerItemQty" Title="PER ITEM QTY" Width="100px" TextAlign="TextAlign.Right" />
+                <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="UnitOfMeasure" Title="U/M" Width="60px" TextAlign="TextAlign.Center" />
+                <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="QtyOnHand" Title="QTY ON HAND" Width="100px" TextAlign="TextAlign.Center">
+                      <Template Context="data">
+                            <RadzenBadge BadgeStyle="@(data.IsAvailable ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                Text="@($"{data.QtyOnHand}")" />
+                        </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="QtyNeeded" Title="QTY NEEDED" Width="100px" TextAlign="TextAlign.Right" />
+                <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="PricePerItem" Title="PRICE/ITEM" FormatString="{0:C}" Width="100px" TextAlign="TextAlign.Right" />
+                <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="TotalPrice" Title="TOTAL" FormatString="{0:C}" Width="100px" TextAlign="TextAlign.Right" />
+            </Columns>
+            <FooterTemplate>
+                 <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem" Style="padding: 10px;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Style="text-transform: uppercase; font-weight: bold;">Total Cost:</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Style="font-weight: bold;">@orderComponents.Sum(c => c.TotalPrice).ToString("C")</RadzenText>
+                </RadzenStack>
+            </FooterTemplate>
+        </RadzenDataGrid>
+
+        <!-- Max Build Alert & Quantity Input -->
+        <RadzenRow Class="mb-4">
+            <RadzenColumn Size="12" SizeMD="8">
+                 <RadzenAlert AlertStyle="AlertStyle.Info" Variant="Variant.Flat" Shade="Shade.Lighter" Class="rz-m-0">
+                    Maximum you can build from quantity on hand: <b>@maxBuildQty ea</b>
+                </RadzenAlert>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenStack Orientation="Orientation.Vertical" Gap="0">
+                     <RadzenLabel Text="QUANTITY TO BUILD" Component="QtyBuild" Style="font-size: 0.8rem; font-weight: bold;" />
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0">
+                        <RadzenNumeric @bind-Value="@workOrder.QuantityOrdered" Name="QtyBuild" Min="1" Max="@maxBuildQty"
+                                Change="@(args => OnQuantityChange(args))" Style="width: 100%"
+                                TValue="int"
+                                Disabled="@(isViewMode || workOrder.WorkOrderId > 0)" />
+                        <span style="padding: 5px 10px; background: #eee; border: 1px solid #ccc; border-left: none; display: flex; align-items: center;">ea</span>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <!-- Memo -->
+        <RadzenLabel Text="MEMO" Component="Memo" Style="font-size: 0.8rem; font-weight: bold;" />
+        <RadzenTextArea Name="Memo" Rows="3" Style="width: 100%; border-color: #e0e0e0;" Placeholder="" />
+
+        <!-- Footer Buttons -->
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Class="mt-5">
+            <RadzenButton Text="Close" ButtonStyle="ButtonStyle.Secondary" Shade="Shade.Light" Click="@Cancel" Style="width: 100px;" />
+            
+            @if (!isViewMode)
+            {
+                <RadzenButton ButtonType="ButtonType.Submit" Text="Build & Close" ButtonStyle="ButtonStyle.Primary" Disabled="@(!canSubmit)" />
+                <RadzenButton Text="Build & New" ButtonStyle="ButtonStyle.Success" Click="@SubmitAndNew" Disabled="@(!canSubmit)" />
+            }
+        </RadzenStack>
+
+    </RadzenCard>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public int? WorkOrderId { get; set; }
+
+    WorkOrder workOrder = new WorkOrder
+    {
+        StartDate = DateTime.Today,
+        OrderNumber = $"WO-{DateTime.Now:yyyyMMddHHmmss}",
+        QuantityOrdered = 1
+    };
+
+    List<Product> products = new();
+    List<Product> productCandidates = new();
+    List<WorkOrderDetailViewModel> orderComponents = new();
+
+    decimal durationHours = 1;
+    string productSearch = "";
+    Product selectedProduct;
+    int maxBuildQty = 0;
+    bool isViewMode = false;
+    bool canSubmit => selectedProduct != null && workOrder.QuantityOrdered > 0 && orderComponents.All(c => c.IsAvailable);
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await ProductService.GetAllProductsAsync();
+
+        if (WorkOrderId.HasValue)
+        {
+            var existing = await WorkOrderService.GetWorkOrderByIdAsync(WorkOrderId.Value);
+            if (existing != null)
+            {
+                workOrder = existing;
+                isViewMode = true;
+                durationHours = (decimal)(workOrder.DurationMinutes / 60.0);
+                selectedProduct = products.FirstOrDefault(p => p.ProductId == workOrder.ProductId);
+                if (selectedProduct != null)
+                {
+                    productSearch = selectedProduct.Name;
+                    await LoadDetails();
+                }
+            }
+        }
+    }
+
+    void OnProductSearch(LoadDataArgs args)
+    {
+        var term = args.Filter;
+        if (!string.IsNullOrEmpty(term))
+        {
+            productCandidates = products.Where(p => p.ProductType == ProductType.Finished &&
+                (p.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                 p.SKU.Contains(term, StringComparison.OrdinalIgnoreCase))).ToList();
+        }
+        else
+        {
+            productCandidates = products.Where(p => p.ProductType == ProductType.Finished).Take(10).ToList();
+        }
+    }
+
+    async Task OnProductSelect()
+    {
+        var p = products.FirstOrDefault(x => x.Name == productSearch);
+        if (p != null)
+        {
+            selectedProduct = p;
+            workOrder.ProductId = p.ProductId;
+            await LoadDetails();
+        }
+    }
+
+    async Task OnQuantityChange(int value)
+    {
+        await LoadDetails();
+    }
+
+    async Task LoadDetails()
+    {
+        if (selectedProduct == null) return;
+
+        orderComponents = await WorkOrderService.GetWorkOrderDetailsAsync(selectedProduct.ProductId, workOrder.QuantityOrdered);
+        
+        // Mocking Type removed - now comes from Service
+
+        // Calculate Max Build
+        var boms = await BOMService.GetBOMByProductIdAsync(selectedProduct.ProductId);
+        if (boms.Any())
+        {
+            var maxVals = new List<int>();
+            foreach (var bom in boms)
+            {
+                var rawMat = products.FirstOrDefault(x => x.ProductId == bom.RawMaterialId);
+                if (rawMat != null && bom.QuantityRequired > 0)
+                {
+                    maxVals.Add((int)(rawMat.Quantity / bom.QuantityRequired));
+                }
+            }
+            maxBuildQty = maxVals.Any() ? maxVals.Min() : 0;
+        }
+        else
+        {
+             maxBuildQty = 0;
+        }
+    }
+
+    async Task OnSubmit(WorkOrder args)
+    {
+        await ProcessSubmission(args);
+        NavigationManager.NavigateTo("/workorders");
+    }
+
+    async Task SubmitAndNew()
+    {
+        if(await ProcessSubmission(workOrder))
+        {
+             // Reset for new
+             workOrder = new WorkOrder
+             {
+                StartDate = DateTime.Today,
+                OrderNumber = $"WO-{DateTime.Now:yyyyMMddHHmmss}",
+                QuantityOrdered = 1
+             };
+             selectedProduct = null;
+             productSearch = "";
+             orderComponents.Clear();
+             maxBuildQty = 0;
+             StateHasChanged();
+        }
+    }
+
+    async Task<bool> ProcessSubmission(WorkOrder args)
+    {
+        try 
+        {
+             workOrder.DurationMinutes = (int)(durationHours * 60);
+             await WorkOrderService.AddWorkOrderAsync(workOrder);
+             NotificationService.Notify(NotificationSeverity.Success, "Success", "Build Assembly Saved");
+             return true;
+        }
+        catch(Exception ex)
+        {
+             NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+             return false;
+        }
+    }
+
+    void Cancel()
+    {
+        NavigationManager.NavigateTo("/workorders");
+    }
+}

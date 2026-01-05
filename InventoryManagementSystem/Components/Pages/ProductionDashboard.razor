@@ -1,0 +1,144 @@
+﻿@page "/production"
+@using InventoryManagementSystem.Models
+@using InventoryManagementSystem.Services
+@using Radzen
+@using Radzen.Blazor
+
+@inject IWorkOrderService WorkOrderService
+@inject IProductionLogService ProductionLogService
+@inject NotificationService NotificationService
+
+<RadzenText TextStyle="TextStyle.H4" Text="Production Dashboard" Class="mb-4" />
+
+@if (isLoading)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+}
+else
+{
+    <RadzenRow>
+        <RadzenColumn Size="3">
+            <RadzenCard>
+                <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenText TextStyle="TextStyle.H6">Active Orders</RadzenText>
+                    <RadzenText TextStyle="TextStyle.DisplayH4" Class="rz-color-info">@activeWorkOrders.Count</RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="3">
+            <RadzenCard>
+                <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenText TextStyle="TextStyle.H6">In Progress</RadzenText>
+                    <RadzenText TextStyle="TextStyle.DisplayH4" Class="rz-color-primary">@inProgressCount</RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="3">
+            <RadzenCard>
+                <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenText TextStyle="TextStyle.H6">Completed Today</RadzenText>
+                    <RadzenText TextStyle="TextStyle.DisplayH4" Class="rz-color-success">@completedTodayCount</RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="3">
+            <RadzenCard>
+                <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenText TextStyle="TextStyle.H6">Pending</RadzenText>
+                    <RadzenText TextStyle="TextStyle.DisplayH4" Class="rz-color-warning">@pendingCount</RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow Class="mt-4">
+        <RadzenColumn Size="6">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.H6" Class="mb-3">Active Work Orders</RadzenText>
+                @if (activeWorkOrders.Any())
+                {
+                    <RadzenDataGrid Data="@activeWorkOrders" TItem="WorkOrder" AllowPaging="true" PageSize="5">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="WorkOrder" Property="OrderNumber" Title="Order #" />
+                            <RadzenDataGridColumn TItem="WorkOrder" Property="Product.Name" Title="Product" />
+                            <RadzenDataGridColumn TItem="WorkOrder" Title="Progress">
+                                <Template Context="w">
+                                    @($"{w.QuantityProduced} / {w.QuantityOrdered}")
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="WorkOrder" Property="Status" Title="Status">
+                                <Template Context="w">
+                                    <RadzenBadge
+                                        BadgeStyle="@(w.Status == WorkOrderStatus.InProgress ? BadgeStyle.Primary : BadgeStyle.Warning)"
+                                        Text="@w.Status.ToString()" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                }
+                else
+                {
+                    <RadzenText TextStyle="TextStyle.Caption">No active work orders.</RadzenText>
+                }
+            </RadzenCard>
+        </RadzenColumn>
+
+        <RadzenColumn Size="6">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.H6" Class="mb-3">Recent Production Logs</RadzenText>
+                @if (recentLogs.Any())
+                {
+                    <RadzenDataGrid Data="@recentLogs" TItem="ProductionLog" AllowPaging="true" PageSize="5">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="ProductionLog" Property="ProductionDate" Title="Date"
+                                FormatString="{0:MM/dd HH:mm}" />
+                            <RadzenDataGridColumn TItem="ProductionLog" Property="WorkOrder.Product.Name" Title="Product" />
+                            <RadzenDataGridColumn TItem="ProductionLog" Property="QuantityProduced" Title="Qty" />
+                            <RadzenDataGridColumn TItem="ProductionLog" Property="OperatorName" Title="Operator" />
+                        </Columns>
+                    </RadzenDataGrid>
+                }
+                else
+                {
+                    <RadzenText TextStyle="TextStyle.Caption">No logs yet.</RadzenText>
+                }
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+}
+
+@code {
+    bool isLoading = true;
+    List<WorkOrder> activeWorkOrders = new();
+    List<ProductionLog> recentLogs = new();
+    int inProgressCount;
+    int completedTodayCount;
+    int pendingCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+
+            var allOrders = await WorkOrderService.GetAllWorkOrdersAsync();
+            activeWorkOrders = allOrders.Where(w => w.Status == WorkOrderStatus.Pending || w.Status ==
+            WorkOrderStatus.InProgress).ToList();
+
+            inProgressCount = allOrders.Count(w => w.Status == WorkOrderStatus.InProgress);
+            pendingCount = allOrders.Count(w => w.Status == WorkOrderStatus.Pending);
+            completedTodayCount = allOrders.Count(w => w.Status == WorkOrderStatus.Completed && w.CompletionDate?.Date ==
+            DateTime.Today);
+
+            recentLogs = await ProductionLogService.GetRecentLogsAsync(10);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load dashboard data: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

@@ -1,0 +1,165 @@
+﻿@page "/suppliers"
+@using InventoryManagementSystem.Models
+@using InventoryManagementSystem.Services
+@using Radzen
+@using Radzen.Blazor
+
+@inject ISupplierService SupplierService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<RadzenStack>
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="6">
+            <RadzenText TextStyle="TextStyle.H4" Text="Suppliers" />
+        </RadzenColumn>
+        <RadzenColumn Size="6" Class="rz-text-align-right">
+            <RadzenButton Icon="add" Text="Add Supplier" Click="@InsertRow" ButtonStyle="ButtonStyle.Primary" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenDataGrid @ref="grid" Data="@suppliers" TItem="Supplier" AllowFiltering="true" AllowPaging="true"
+        AllowSorting="true" EditMode="DataGridEditMode.Single" RowUpdate="@OnUpdateRow" RowCreate="@OnCreateRow"
+        IsLoading="@isLoading">
+        <Columns>
+            <RadzenDataGridColumn TItem="Supplier" Property="Name" Title="Name">
+                <EditTemplate Context="supplier">
+                    <RadzenTextBox @bind-Value="supplier.Name" Style="width:100%;" Name="Name" />
+                    <RadzenRequiredValidator Text="Name is required" Component="Name" Popup="true" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="Supplier" Property="ContactPerson" Title="Contact Person">
+                <EditTemplate Context="supplier">
+                    <RadzenTextBox @bind-Value="supplier.ContactPerson" Style="width:100%;" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="Supplier" Property="Email" Title="Email">
+                <EditTemplate Context="supplier">
+                    <RadzenTextBox @bind-Value="supplier.Email" Style="width:100%;" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="Supplier" Property="Phone" Title="Phone">
+                <EditTemplate Context="supplier">
+                    <RadzenTextBox @bind-Value="supplier.Phone" Style="width:100%;" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="Supplier" Title="Actions" Width="120px" Sortable="false" Filterable="false">
+                <Template Context="supplier">
+                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Medium"
+                        Click="@(args => EditRow(supplier))" @onclick:stopPropagation="true" />
+                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Medium"
+                        Click="@(args => DeleteRow(supplier))" @onclick:stopPropagation="true" />
+                </Template>
+                <EditTemplate Context="supplier">
+                    <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Medium"
+                        Click="@((args) => SaveRow(supplier))" />
+                    <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Medium"
+                        Click="@((args) => CancelEdit(supplier))" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenStack>
+
+@code {
+    List<Supplier> suppliers;
+    RadzenDataGrid<Supplier> grid;
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        try
+        {
+            isLoading = true;
+            suppliers = await SupplierService.GetAllSuppliersAsync();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load suppliers: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    async Task InsertRow()
+    {
+        var supplier = new Supplier();
+        await grid.InsertRow(supplier);
+    }
+
+    async Task EditRow(Supplier supplier)
+    {
+        await grid.EditRow(supplier);
+    }
+
+    async Task SaveRow(Supplier supplier)
+    {
+        await grid.UpdateRow(supplier);
+    }
+
+    void CancelEdit(Supplier supplier)
+    {
+        grid.CancelEditRow(supplier);
+    }
+
+    async Task DeleteRow(Supplier supplier)
+    {
+        try
+        {
+            var confirm = await DialogService.Confirm("Are you sure?", "Delete Supplier", new ConfirmOptions()
+                {
+                    OkButtonText =
+                "Yes",
+                    CancelButtonText = "No"
+                });
+            if (confirm == true)
+            {
+                await SupplierService.DeleteSupplierAsync(supplier.SupplierId);
+                await LoadData();
+                NotificationService.Notify(NotificationSeverity.Success, "Deleted", "Supplier deleted");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to delete supplier: {ex.Message}");
+        }
+    }
+
+    async Task OnCreateRow(Supplier supplier)
+    {
+        try
+        {
+            await SupplierService.AddSupplierAsync(supplier);
+            await LoadData();
+            NotificationService.Notify(NotificationSeverity.Success, "Success", "Supplier added");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to create supplier: {ex.Message}");
+        }
+    }
+
+    async Task OnUpdateRow(Supplier supplier)
+    {
+        try
+        {
+            await SupplierService.UpdateSupplierAsync(supplier);
+            NotificationService.Notify(NotificationSeverity.Success, "Success", "Supplier updated");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to update supplier: {ex.Message}");
+        }
+    }
+}

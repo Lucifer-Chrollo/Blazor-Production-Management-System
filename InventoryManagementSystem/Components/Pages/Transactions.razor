@@ -1,0 +1,96 @@
+﻿@page "/transactions"
+@using InventoryManagementSystem.Models
+@using InventoryManagementSystem.Services
+@using Radzen
+@using Radzen.Blazor
+
+@inject IStockTransactionService TransactionService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<RadzenStack>
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="6">
+            <RadzenText TextStyle="TextStyle.H4" Text="Stock Transactions" />
+        </RadzenColumn>
+        <RadzenColumn Size="6" Class="rz-text-align-right">
+            <RadzenButton Icon="add" Text="Add Transaction" Click="@ShowAddDialog" ButtonStyle="ButtonStyle.Primary" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenDataGrid Data="@transactions" TItem="StockTransaction" AllowFiltering="true" AllowPaging="true"
+        AllowSorting="true" PageSize="15" IsLoading="@isLoading">
+        <Columns>
+            <RadzenDataGridColumn TItem="StockTransaction" Property="TransactionDate" Title="Date" FormatString="{0:g}"
+                Width="160px" />
+            <RadzenDataGridColumn TItem="StockTransaction" Property="Product.Name" Title="Product" />
+            <RadzenDataGridColumn TItem="StockTransaction" Property="Type" Title="Type" Width="120px">
+                <Template Context="t">
+                    <RadzenBadge BadgeStyle="@GetBadgeStyle(t.Type)" Text="@t.Type.ToString()" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="StockTransaction" Property="Quantity" Title="Qty" Width="100px"
+                TextAlign="TextAlign.Center" />
+            <RadzenDataGridColumn TItem="StockTransaction" Property="Reference" Title="Reference" />
+            <RadzenDataGridColumn TItem="StockTransaction" Property="Notes" Title="Notes" />
+        </Columns>
+    </RadzenDataGrid>
+</RadzenStack>
+
+@code {
+    List<StockTransaction> transactions = new();
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        try
+        {
+            isLoading = true;
+            transactions = await TransactionService.GetAllTransactionsAsync();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load transactions: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    async Task ShowAddDialog()
+    {
+        try
+        {
+            var result = await DialogService.OpenAsync<TransactionDialog>("New Transaction",
+            new Dictionary<string, object>(),
+            new DialogOptions() { Width = "500px", Height = "550px" });
+
+            if (result == true)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Transaction added");
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to open transaction dialog: {ex.Message}");
+        }
+    }
+
+    BadgeStyle GetBadgeStyle(TransactionType type)
+    {
+        return type switch
+        {
+            TransactionType.StockIn => BadgeStyle.Success,
+            TransactionType.StockOut => BadgeStyle.Danger,
+            TransactionType.Adjustment => BadgeStyle.Warning,
+            _ => BadgeStyle.Light
+        };
+    }
+}

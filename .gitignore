@@ -1,0 +1,15 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+*.userprefs
+
+# VS Code
+.vscode/
+
+# Ignore local config
+appsettings.Development.json

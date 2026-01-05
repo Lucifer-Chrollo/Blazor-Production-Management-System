@@ -1,0 +1,216 @@
+@using InventoryManagementSystem.Models
+@using InventoryManagementSystem.Services
+@using Radzen
+@using Radzen.Blazor
+
+@inject IWorkOrderService WorkOrderService
+@inject IProductService ProductService
+@inject IBillOfMaterialsService BOMService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<RadzenTemplateForm Data="@workOrder" Submit="@((WorkOrder args) => OnSubmit(args))">
+    <RadzenStack Gap="1rem">
+        <RadzenRow AlignItems="AlignItems.Center">
+            <RadzenColumn Size="4">
+                <RadzenFormField Text="Order #" Variant="Variant.Outlined" Style="width: 100%">
+                    <RadzenTextBox @bind-Value="@workOrder.OrderNumber" ReadOnly="true" Style="width: 100%" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="4">
+                <RadzenFormField Text="Start Date" Variant="Variant.Outlined" Style="width: 100%">
+                    <RadzenDatePicker @bind-Value="@workOrder.StartDate" Style="width: 100%" Disabled="@isViewMode" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="4">
+                <RadzenFormField Text="Duration (Hrs)" Variant="Variant.Outlined" Style="width: 100%">
+                    <RadzenNumeric @bind-Value="@durationHours" Style="width: 100%"
+                        Disabled="@isViewMode" TValue="decimal" />
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenCard Variant="Variant.Outlined">
+            <RadzenStack>
+                <RadzenRow AlignItems="AlignItems.Center">
+                    <RadzenColumn Size="8">
+                        <RadzenLabel Text="Assembly Item (Finished Good)" Component="ProductSearch" />
+                        <RadzenAutoComplete Data="@productCandidates" TextProperty="Name" @bind-Value="@productSearch"
+                            LoadData="@OnProductSearch" Change="@OnProductSelect" Placeholder="Search Product..."
+                            Style="width: 100%" Name="ProductSearch"
+                            Disabled="@(isViewMode || workOrder.WorkOrderId > 0)" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="4">
+                        <RadzenLabel Text="Quantity to Build" Component="Qty" />
+                        <RadzenNumeric @bind-Value="@workOrder.QuantityOrdered" Name="Qty" Min="1" Max="@maxBuildQty"
+                            Change="@((int args) => OnQuantityChange(args))" Style="width: 100%"
+                            Disabled="@(isViewMode || workOrder.WorkOrderId > 0)" />
+                    </RadzenColumn>
+                </RadzenRow>
+                @if (selectedProduct != null)
+                {
+                    <RadzenText TextStyle="TextStyle.Caption">Current Stock: @selectedProduct.Quantity | Max Possible Build:
+                        @maxBuildQty</RadzenText>
+                }
+            </RadzenStack>
+        </RadzenCard>
+
+        @if (orderComponents.Any())
+        {
+            <RadzenText TextStyle="TextStyle.H6" Class="mt-2">Components Needed</RadzenText>
+            <RadzenDataGrid Data="@orderComponents" TItem="WorkOrderDetailViewModel" AllowPaging="true" PageSize="5">
+                <Columns>
+                    <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="ItemCode" Title="SKU" Width="120px" />
+                    <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="Description" Title="Name" />
+                    <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="PerItemQty" Title="Per Item"
+                        Width="80px" TextAlign="TextAlign.Center" />
+                    <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="UnitOfMeasure" Title="Unit" Width="70px" />
+                    <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="QtyOnHand" Title="Stock" Width="80px"
+                        TextAlign="TextAlign.Center">
+                        <Template Context="data">
+                            <RadzenBadge BadgeStyle="@(data.IsAvailable ? BadgeStyle.Success : BadgeStyle.Danger)"
+                                Text="@($"{data.QtyOnHand}")" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="QtyNeeded" Title="Needed" Width="80px"
+                        TextAlign="TextAlign.Center" />
+                    <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="PricePerItem" Title="Unit Cost"
+                        FormatString="{0:C}" Width="90px" TextAlign="TextAlign.Right" />
+                    <RadzenDataGridColumn TItem="WorkOrderDetailViewModel" Property="TotalPrice" Title="Total Cost"
+                        FormatString="{0:C}" Width="100px" TextAlign="TextAlign.Right" />
+                </Columns>
+                <FooterTemplate>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem"
+                        AlignItems="AlignItems.Center">
+                        <RadzenText TextStyle="TextStyle.Subtitle1"><b>Total Cost:</b></RadzenText>
+                        <RadzenText TextStyle="TextStyle.H6">@orderComponents.Sum(c => c.TotalPrice).ToString("C")
+                        </RadzenText>
+                    </RadzenStack>
+                </FooterTemplate>
+            </RadzenDataGrid>
+        }
+        else if (selectedProduct != null)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Warning" Variant="Variant.Flat" Shade="Shade.Lighter">
+                No BOM defined for this product.
+            </RadzenAlert>
+        }
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" Class="mt-2">
+            @if (!isViewMode)
+            {
+                <RadzenButton ButtonType="ButtonType.Submit" Text="Create Order" Icon="save"
+                    ButtonStyle="ButtonStyle.Primary" Disabled="@(!canSubmit)" />
+            }
+            <RadzenButton Text="Close" Click="@(() => DialogService.Close(false))" ButtonStyle="ButtonStyle.Light" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public int? WorkOrderId { get; set; }
+
+    WorkOrder workOrder = new WorkOrder
+        {
+            StartDate = DateTime.Today,
+            OrderNumber = $"WO-{DateTime.Now:yyyyMMddHHmmss}",
+            QuantityOrdered = 1
+        };
+    List<Product> products = new();
+    List<Product> productCandidates = new();
+    List<WorkOrderDetailViewModel> orderComponents = new();
+
+    decimal durationHours = 1;
+    string productSearch = "";
+    Product selectedProduct;
+    int maxBuildQty = 0;
+    bool isViewMode = false;
+    bool canSubmit => selectedProduct != null && workOrder.QuantityOrdered > 0 && orderComponents.All(c => c.IsAvailable);
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await ProductService.GetAllProductsAsync();
+
+        if (WorkOrderId.HasValue)
+        {
+            var existing = await WorkOrderService.GetWorkOrderByIdAsync(WorkOrderId.Value);
+            if (existing != null)
+            {
+                workOrder = existing;
+                isViewMode = true; // Or check status
+                durationHours = (decimal)(workOrder.DurationMinutes / 60.0);
+
+                selectedProduct = products.FirstOrDefault(p => p.ProductId == workOrder.ProductId);
+                if (selectedProduct != null)
+                {
+                    productSearch = selectedProduct.Name;
+                    await LoadDetails();
+                }
+            }
+        }
+    }
+
+    void OnProductSearch(LoadDataArgs args)
+    {
+        var term = args.Filter;
+        if (!string.IsNullOrEmpty(term))
+        {
+            productCandidates = products.Where(p => p.ProductType == ProductType.Finished &&
+            (p.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+            p.SKU.Contains(term, StringComparison.OrdinalIgnoreCase))).ToList();
+        }
+        else
+        {
+            productCandidates = products.Where(p => p.ProductType == ProductType.Finished).Take(10).ToList();
+        }
+    }
+
+    async Task OnProductSelect()
+    {
+        // RadzenAutoComplete binds value to string.
+        // We find the product based on name match or we use specific property.
+        // Better: Use LoadData and candidates.
+        var p = products.FirstOrDefault(x => x.Name == productSearch); // Naive match
+        if (p != null)
+        {
+            selectedProduct = p;
+            workOrder.ProductId = p.ProductId;
+            await LoadDetails();
+        }
+    }
+
+    async Task OnQuantityChange(int value)
+    {
+        await LoadDetails();
+    }
+
+    async Task LoadDetails()
+    {
+        if (selectedProduct == null) return;
+
+        orderComponents = await WorkOrderService.GetWorkOrderDetailsAsync(selectedProduct.ProductId, workOrder.QuantityOrdered);
+
+        // reimplement max build calc
+        var boms = await BOMService.GetBOMByProductIdAsync(selectedProduct.ProductId);
+        if (boms.Any())
+        {
+            var maxVals = new List<int>();
+            foreach (var bom in boms)
+            {
+                var rawMat = products.FirstOrDefault(x => x.ProductId == bom.RawMaterialId);
+                if (rawMat != null && bom.QuantityRequired > 0)
+                {
+                    maxVals.Add((int)(rawMat.Quantity / bom.QuantityRequired));
+                }
+            }
+            maxBuildQty = maxVals.Any() ? maxVals.Min() : 0;
+        }
+    }
+
+    async Task OnSubmit(WorkOrder args)
+    {
+        workOrder.DurationMinutes = (int)(durationHours * 60);
+        await WorkOrderService.AddWorkOrderAsync(workOrder);
+        DialogService.Close(true);
+    }
+}

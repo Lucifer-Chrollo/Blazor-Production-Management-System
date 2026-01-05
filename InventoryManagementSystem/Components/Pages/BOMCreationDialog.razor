@@ -1,0 +1,413 @@
+@using InventoryManagementSystem.Models
+@using InventoryManagementSystem.Services
+@using Radzen
+@using Radzen.Blazor
+
+@inject IProductService ProductService
+@inject IBillOfMaterialsService BOMService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<RadzenStack Gap="1rem">
+    <!-- Header -->
+    <RadzenRow AlignItems="AlignItems.Center" Style="background: linear-gradient(135deg, #1976D2 0%, #2196F3 100%); padding: 1rem; margin: -1rem -1rem 0 -1rem; border-radius: 4px 4px 0 0;">
+        <RadzenColumn Size="12">
+            <RadzenText TextStyle="TextStyle.H5" Style="color: white; margin: 0; font-weight: 500;">
+                @if (isEditMode) 
+                {
+                    <text>Manage Bill of Materials (Live Edit)</text>
+                } 
+                else 
+                {
+                    <text>Create New Bill of Materials</text>
+                }
+            </RadzenText>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <!-- Step 1: Select Finished Product (Only in Create Mode) -->
+    @if (!isEditMode)
+    {
+        <RadzenCard Variant="Variant.Outlined" Style="padding: 1.5rem;">
+            <RadzenText TextStyle="TextStyle.Subtitle1" Style="font-weight: 600; margin-bottom: 0.5rem;">
+                Step 1: Select Finished Product
+            </RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" Class="rz-color-secondary-text" Style="margin-bottom: 1rem;">
+                Select the product you want to manufacture.
+            </RadzenText>
+
+            <RadzenDropDown @bind-Value="@selectedProductId" 
+                            Data="@finishedProducts" 
+                            TextProperty="Name" 
+                            ValueProperty="ProductId"
+                            Change="@OnProductSelected"
+                            AllowFiltering="true"
+                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                            Placeholder="-- Select Finished Product --"
+                            Style="width: 100%; margin-bottom: 1rem;" />
+
+            @if (selectedProduct != null)
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Info" Variant="Variant.Flat" Shade="Shade.Lighter">
+                    <strong>Selected:</strong> @selectedProduct.Name (@selectedProduct.SKU) | <strong>Stock:</strong> @selectedProduct.Quantity
+                </RadzenAlert>
+            }
+        </RadzenCard>
+    }
+    else
+    {
+        <!-- Read-Only Header for Edit Mode -->
+        @if (selectedProduct != null)
+        {
+             <RadzenCard Variant="Variant.Flat" Style="background-color: #E3F2FD; padding: 1rem; border-left: 4px solid #2196F3;">
+                <RadzenText TextStyle="TextStyle.Subtitle2" Style="font-weight: 600; margin-bottom: 0.5rem;">
+                    Managing BOM for:
+                </RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="6">
+                        <RadzenText TextStyle="TextStyle.Body2"><strong>Name:</strong> @selectedProduct.Name</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2"><strong>SKU:</strong> @selectedProduct.SKU</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="6">
+                        <RadzenText TextStyle="TextStyle.Body2"><strong>Category:</strong> @selectedProduct.Category?.Name</RadzenText>
+                         <RadzenText TextStyle="TextStyle.Body2"><strong>Materials Count:</strong> @materials.Count</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenCard>
+        }
+    }
+
+    <!-- Step 2: Add Raw Materials (Visible if Product Selected) -->
+    @if (selectedProduct != null)
+    {
+        <RadzenCard Variant="Variant.Outlined" Style="padding: 1.5rem;">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Style="margin-bottom: 0.5rem;">
+                 <RadzenText TextStyle="TextStyle.Subtitle1" Style="font-weight: 600; margin: 0;">
+                    @(isEditMode ? "Raw Materials List" : "Step 2: Add Raw Materials")
+                </RadzenText>
+            </RadzenStack>
+
+            <!-- Materials Table -->
+            @if (materials.Any())
+            {
+                <RadzenDataGrid Data="@materials" TItem="BillOfMaterials" AllowPaging="false" 
+                                Density="Density.Compact" GridLines="DataGridGridLines.Horizontal"
+                                Style="margin-bottom: 1.5rem;">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="BillOfMaterials" Title="Material" Width="30%">
+                            <Template Context="item">
+                                <RadzenText TextStyle="TextStyle.Body2" Style="font-weight: 500;">
+                                    @GetMaterialName(item.RawMaterialId)
+                                </RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption" Class="rz-color-secondary-text">
+                                     SKU: @GetMaterialSKU(item.RawMaterialId)
+                                </RadzenText>
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="BillOfMaterials" Property="QuantityRequired" Title="Qty" Width="15%">
+                            <Template Context="item">
+                                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@item.QuantityRequired.ToString("0.##")" Shade="Shade.Light" /> @item.Unit
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="BillOfMaterials" Title="Stock" Width="15%">
+                            <Template Context="item">
+                                @{
+                                    var stock = GetMaterialStock(item.RawMaterialId);
+                                    var badgeStyle = stock > 0 ? BadgeStyle.Success : BadgeStyle.Danger;
+                                }
+                                <RadzenBadge BadgeStyle="@badgeStyle" Text="@stock.ToString()" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                         <RadzenDataGridColumn TItem="BillOfMaterials" Property="Notes" Title="Notes" Width="20%" />
+                        <RadzenDataGridColumn TItem="BillOfMaterials" Title="Actions" Width="20%" Sortable="false" TextAlign="TextAlign.Right">
+                            <Template Context="item">
+                                @if (isEditMode)
+                                {
+                                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.ExtraSmall" Variant="Variant.Flat"
+                                                  Click="@(() => DeleteMaterialLive(item))" />
+                                }
+                                else
+                                {
+                                     <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.ExtraSmall" Variant="Variant.Flat"
+                                                  Click="@(() => RemoveMaterialDraft(item))" />
+                                }
+                            </Template>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+            }
+            else
+            {
+                 <RadzenAlert AlertStyle="AlertStyle.Warning" Variant="Variant.Flat" Shade="Shade.Lighter" Class="rz-mb-4">
+                    No materials added yet.
+                </RadzenAlert>
+            }
+
+            <!-- Add Form -->
+            <RadzenCard Variant="Variant.Flat" Class="rz-p-3" Style="background-color: #f8f9fa; border: 1px solid #dee2e6;">
+                 <RadzenText TextStyle="TextStyle.Subtitle2" Style="font-weight: 600; margin-bottom: 0.5rem; color: #2196F3;">
+                    Add New Material
+                </RadzenText>
+                
+                <RadzenRow AlignItems="AlignItems.End">
+                    <RadzenColumn Size="12" SizeMD="5">
+                        <RadzenLabel Text="Raw Material" Component="RawMat" />
+                         <RadzenAutoComplete Data="@filteredRawMaterials" 
+                                            TextProperty="Name" 
+                                            LoadData="@OnLoadRawMaterials"
+                                            Change="@OnRawMaterialChange"
+                                            @bind-Value="@rawMaterialSearchText"
+                                            Placeholder="Search Name/SKU..."
+                                            Style="width: 100%" 
+                                            Name="RawMat"
+                                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive">
+                                <Template Context="prod">
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                        <RadzenText TextStyle="TextStyle.Body2" Style="margin: 0; font-weight: 500;">@prod.Name</RadzenText>
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@prod.SKU" Variant="Variant.Flat" />
+                                    </RadzenStack>
+                                </Template>
+                        </RadzenAutoComplete>
+                    </RadzenColumn>
+                    <RadzenColumn Size="6" SizeMD="2">
+                        <RadzenLabel Text="Qty" Component="Qty" />
+                        <RadzenNumeric @bind-Value="@newQuantity" Min="0.01m" Step="1" Style="width: 100%;" Name="Qty" />
+                    </RadzenColumn>
+                     <RadzenColumn Size="6" SizeMD="2">
+                        <RadzenLabel Text="Unit" Component="Unit" />
+                        <RadzenTextBox @bind-Value="@newUnit" Style="width: 100%;" Name="Unit" />
+                    </RadzenColumn>
+                     <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenButton Text="@(isEditMode ? "Add Live" : "Add to List")" 
+                                      Click="@AddMaterial" 
+                                      ButtonStyle="ButtonStyle.Success" 
+                                      Icon="add_circle"
+                                      Style="width: 100%" />
+                    </RadzenColumn>
+                </RadzenRow>
+                 <RadzenRow Class="rz-mt-2">
+                    <RadzenColumn Size="12">
+                         <RadzenTextBox @bind-Value="@newNotes" Placeholder="Optional Notes..." Style="width: 100%;" />
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenCard>
+
+            @if (isEditMode)
+            {
+                 <RadzenText TextStyle="TextStyle.Caption" Class="rz-color-secondary-text rz-mt-2" Style="font-style: italic;">
+                    <RadzenIcon Icon="info" Style="font-size: 0.8rem; margin-right: 0.25rem;" />
+                    Live Mode: Changes are saved to the database immediately.
+                </RadzenText>
+            }
+        </RadzenCard>
+    }
+
+    <!-- Footer Actions -->
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" Style="margin-top: 1rem;">
+        @if (isEditMode)
+        {
+             <RadzenButton Text="Close" Click="@(() => DialogService.Close(true))" ButtonStyle="ButtonStyle.Secondary" Style="min-width: 100px;" />
+        }
+        else
+        {
+             <RadzenButton Text="Cancel" Click="@(() => DialogService.Close(false))" ButtonStyle="ButtonStyle.Light" Style="min-width: 100px;" />
+             <RadzenButton Text="Save BOM" Click="@SaveDraftBOM" ButtonStyle="ButtonStyle.Primary" Icon="save" Disabled="@(selectedProduct == null || !materials.Any())" Style="min-width: 120px;" />
+        }
+    </RadzenStack>
+
+</RadzenStack>
+
+@code {
+    [Parameter] public int? ProductId { get; set; }
+
+    List<Product> finishedProducts = new();
+    List<Product> allProducts = new();
+    List<Product> rawMaterials = new();
+    
+    // Selection state
+    int selectedProductId = 0;
+    Product? selectedProduct;
+    
+    // Material List state (acts as Draft or Live list depending on mode)
+    List<BillOfMaterials> materials = new();
+    
+    // Add Form state
+    int selectedRawMaterialId = 0;
+    string rawMaterialSearchText = string.Empty;
+    decimal newQuantity = 1;
+    string newUnit = "pcs";
+    string newNotes = string.Empty;
+    IEnumerable<Product> filteredRawMaterials = new List<Product>();
+
+    bool isEditMode = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        allProducts = await ProductService.GetAllProductsAsync();
+        // Load finished products for dropdown (General type)
+        finishedProducts = allProducts.Where(p => p.ProductType == ProductType.Finished).ToList();
+        // Load raw materials for autocomplete (Assembly type)
+        rawMaterials = allProducts.Where(p => p.ProductType == ProductType.Assembly).ToList();
+
+        if (ProductId.HasValue && ProductId.Value > 0)
+        {
+            isEditMode = true;
+            selectedProductId = ProductId.Value;
+            OnProductSelected(selectedProductId);
+            // Load existing BOMs for Live Edit
+            materials = await BOMService.GetBOMByProductIdAsync(ProductId.Value);
+        }
+    }
+
+    void OnProductSelected(object value)
+    {
+        if (value is int productId && productId > 0)
+        {
+            selectedProduct = allProducts.FirstOrDefault(p => p.ProductId == productId);
+            if (!isEditMode)
+            {
+                // In draft mode, clear materials if product changes? 
+                // Usually user selects product first. 
+                // If they change, we should probably clear to avoid confusion, or keep.
+                // Choosing to keep for now, or clear if desired.
+                // materials.Clear(); 
+            }
+        }
+    }
+
+    void OnLoadRawMaterials(LoadDataArgs args)
+    {
+        var query = args.Filter ?? string.Empty;
+        filteredRawMaterials = rawMaterials.Where(p => 
+            p.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || 
+            p.SKU.Contains(query, StringComparison.OrdinalIgnoreCase)
+        ).Take(10).ToList();
+    }
+
+    async Task OnRawMaterialChange(object value)
+    {
+        if (value is string text && !string.IsNullOrWhiteSpace(text))
+        {
+            var match = rawMaterials.FirstOrDefault(p => p.Name.Equals(text, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+            {
+                selectedRawMaterialId = match.ProductId;
+                await Task.Delay(50); 
+                rawMaterialSearchText = match.Name;
+                StateHasChanged();
+            }
+            else
+            {
+                selectedRawMaterialId = 0;
+            }
+        }
+        else
+        {
+             selectedRawMaterialId = 0;
+        }
+    }
+
+    async Task AddMaterial()
+    {
+        if (selectedRawMaterialId == 0)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Validation", "Select a raw material.");
+            return;
+        }
+        if (newQuantity <= 0)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Validation", "Quantity > 0 required.");
+            return;
+        }
+        
+        // Prevent duplicate (check existing list)
+        if (materials.Any(m => m.RawMaterialId == selectedRawMaterialId))
+        {
+             NotificationService.Notify(NotificationSeverity.Warning, "Duplicate", "Material already in list.");
+             return;
+        }
+
+        if (isEditMode)
+        {
+            // LIVE MODE - Add directly to DB
+            var newItem = new BillOfMaterials
+            {
+                FinishedProductId = selectedProduct.ProductId,
+                RawMaterialId = selectedRawMaterialId,
+                QuantityRequired = newQuantity,
+                Unit = newUnit,
+                Notes = newNotes,
+                IsActive = true,
+                CreatedDate = DateTime.Now
+            };
+
+            await BOMService.AddBOMAsync(newItem);
+            NotificationService.Notify(NotificationSeverity.Success, "Added", "Material added to BOM.");
+            
+            // Reload list
+            materials = await BOMService.GetBOMByProductIdAsync(selectedProduct.ProductId);
+        }
+        else
+        {
+            // DRAFT MODE - Add to memory list
+            materials.Add(new BillOfMaterials
+            {
+                RawMaterialId = selectedRawMaterialId,
+                QuantityRequired = newQuantity,
+                Unit = newUnit,
+                Notes = newNotes,
+                IsActive = true
+            });
+             NotificationService.Notify(NotificationSeverity.Info, "Added", "Added to draft list.");
+        }
+
+        // Reset Form
+        selectedRawMaterialId = 0;
+        rawMaterialSearchText = string.Empty;
+        newQuantity = 1;
+        newNotes = string.Empty;
+    }
+
+    async Task DeleteMaterialLive(BillOfMaterials item)
+    {
+        var confirm = await DialogService.Confirm("Delete this material from BOM?", "Confirm Delete", new ConfirmOptions { OkButtonText = "Delete", CancelButtonText = "Cancel" });
+        if (confirm == true)
+        {
+            await BOMService.DeleteBOMAsync(item.BOMId);
+            materials = await BOMService.GetBOMByProductIdAsync(selectedProduct.ProductId);
+            NotificationService.Notify(NotificationSeverity.Success, "Deleted", "Material removed.");
+        }
+    }
+
+    void RemoveMaterialDraft(BillOfMaterials item)
+    {
+        materials.Remove(item);
+    }
+
+    async Task SaveDraftBOM()
+    {
+        // Bulk save for Draft Mode
+        if (selectedProduct == null) return;
+
+        try 
+        {
+            foreach(var item in materials)
+            {
+                item.FinishedProductId = selectedProduct.ProductId;
+                item.CreatedDate = DateTime.Now;
+                await BOMService.AddBOMAsync(item);
+            }
+             NotificationService.Notify(NotificationSeverity.Success, "Success", "BOM Created successfully!");
+             DialogService.Close(true);
+        }
+        catch(Exception ex)
+        {
+             NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed: {ex.Message}");
+        }
+    }
+
+    // Helpers
+    string GetMaterialName(int id) => allProducts.FirstOrDefault(p => p.ProductId == id)?.Name ?? "Unknown";
+    string GetMaterialSKU(int id) => allProducts.FirstOrDefault(p => p.ProductId == id)?.SKU ?? "-";
+    int GetMaterialStock(int id) => allProducts.FirstOrDefault(p => p.ProductId == id)?.Quantity ?? 0;
+}

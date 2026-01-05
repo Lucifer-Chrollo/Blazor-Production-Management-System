@@ -1,0 +1,244 @@
+﻿@page "/products"
+@using InventoryManagementSystem.Models
+@using InventoryManagementSystem.Services
+@using Radzen
+@using Radzen.Blazor
+@using System.Linq
+
+@inject IProductService ProductService
+@inject ICategoryService CategoryService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<RadzenStack>
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="6">
+            <RadzenText TextStyle="TextStyle.H4" Text="Manage Products" />
+        </RadzenColumn>
+        <RadzenColumn Size="6" Class="rz-text-align-right">
+            <RadzenButton Icon="add" Text="Add New Product" ButtonStyle="ButtonStyle.Primary" Click="@ShowAddProduct" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow AlignItems="AlignItems.Center" Class="mb-4">
+        <RadzenColumn Size="12" SizeMD="8">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+                <RadzenDropDown @bind-Value="selectedProductType"
+                    Data="@(Enum.GetValues(typeof(ProductType)).Cast<ProductType?>().Prepend(null))"
+                    TValue="ProductType?" Placeholder="All Items" Change="@FilterProducts" Style="width: 200px;" />
+
+                <RadzenDropDown @bind-Value="selectedCategoryId" Data="@categories" TextProperty="Name"
+                    ValueProperty="CategoryId" Placeholder="Filter By Category" AllowClear="true"
+                    Change="@FilterProducts" Style="width: 200px;" />
+            </RadzenStack>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem"
+                JustifyContent="JustifyContent.End">
+                <RadzenAutoComplete Data="@productSuggestions" TextProperty="Name" @bind-Value="searchText"
+                    LoadData="@OnSearchLoadData" Change="@FilterProducts" Placeholder="Search..."
+                    Style="width: 100%;" />
+                <RadzenButton Text="Search" Icon="search" Click="@FilterProducts" />
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenDataGrid @ref="grid" Data="@filteredProducts" TItem="Product" AllowFiltering="true" AllowPaging="true"
+        AllowSorting="true" PageSize="10" IsLoading="@isLoading">
+        <Columns>
+            <RadzenDataGridColumn TItem="Product" Property="ProductId" Title="ID" Width="50px" />
+            <RadzenDataGridColumn TItem="Product" Property="Name" Title="Name" Width="200px">
+                <Template Context="data">
+                    <RadzenText TextStyle="TextStyle.Body1" Style="font-weight:bold;">@data.Name</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption">@data.SKU</RadzenText>
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="Product" Property="Description" Title="Description" Width="150px" />
+            <RadzenDataGridColumn TItem="Product" Property="Category.Name" Title="Category" Width="120px" />
+            <RadzenDataGridColumn TItem="Product" Property="ProductType" Title="Type" Width="100px">
+                <Template Context="data">
+                    <RadzenBadge
+                        BadgeStyle="@(data.ProductType == ProductType.Finished ? BadgeStyle.Success : BadgeStyle.Secondary)"
+                        Text="@(data.ProductType.ToString())" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="Product" Property="Quantity" Title="Qty" Width="80px"
+                TextAlign="TextAlign.Center">
+                <Template Context="data">
+                    <RadzenText TextStyle="TextStyle.Body1"
+                        class="@(data.Quantity <= data.MinimumStock ? "rz-color-danger" : "")">
+                        @data.Quantity
+                    </RadzenText>
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="Product" Property="PurchasePrice" Title="Purchase" FormatString="{0:C}"
+                Width="100px" />
+            <RadzenDataGridColumn TItem="Product" Property="SalePrice" Title="Sale" FormatString="{0:C}"
+                Width="100px" />
+            <RadzenDataGridColumn TItem="Product" Property="SalePriceWithGST" Title="Sale (GST)" FormatString="{0:C}"
+                Width="110px" />
+            <RadzenDataGridColumn TItem="Product" Property="Location" Title="Location" Width="120px" />
+            <RadzenDataGridColumn TItem="Product" Property="ProductModel" Title="Model" Width="120px" />
+            <RadzenDataGridColumn TItem="Product" Title="Actions" Width="100px" Sortable="false" Filterable="false">
+                <Template Context="data">
+                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Medium"
+                        Click="@(() => ShowEditProduct(data))" />
+                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Medium"
+                        Click="@(() => DeleteProduct(data))" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenStack>
+
+@code {
+    List<Product> products = new();
+    List<Product> filteredProducts = new();
+    List<Category> categories = new();
+    bool isLoading = true;
+
+    ProductType? selectedProductType;
+    int? selectedCategoryId;
+    string searchText = "";
+    RadzenDataGrid<Product>? grid;
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await CategoryService.GetAllCategoriesAsync();
+        await LoadProducts();
+    }
+
+    async Task LoadProducts()
+    {
+        try
+        {
+            isLoading = true;
+            products = await ProductService.GetAllProductsAsync();
+            FilterProducts();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load products: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    void FilterProducts()
+    {
+        try
+        {
+            var query = products.AsEnumerable();
+
+            if (selectedProductType.HasValue)
+            {
+                query = query.Where(p => p.ProductType == selectedProductType.Value);
+            }
+
+            if (selectedCategoryId.HasValue)
+            {
+                query = query.Where(p => p.CategoryId == selectedCategoryId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                query = query.Where(p => p.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                || p.SKU.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+            }
+
+            filteredProducts = query.ToList();
+            if (grid != null) grid.FirstPage();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Filtering failed: {ex.Message}");
+        }
+    }
+
+    List<Product> productSuggestions = new List<Product>();
+
+    void OnSearchLoadData(LoadDataArgs args)
+    {
+        try
+        {
+            var query = args.Filter ?? string.Empty;
+            if (!string.IsNullOrEmpty(query))
+            {
+                productSuggestions = products.Where(p => p.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                p.SKU.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .Take(10).ToList();
+            }
+            else
+            {
+                productSuggestions = new List<Product>();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Silent fail for search suggestion or log
+            Console.WriteLine($"Search error: {ex.Message}");
+        }
+    }
+
+    async Task ShowAddProduct()
+    {
+        try
+        {
+            var result = await DialogService.OpenAsync<ProductForm>("Add Product",
+            new Dictionary<string, object>(),
+            new DialogOptions() { Width = "800px", Height = "700px", Resizable = true, Draggable = true });
+
+            if (result == true)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Product added successfully");
+                await LoadProducts();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to add product: {ex.Message}");
+        }
+    }
+
+    async Task ShowEditProduct(Product product)
+    {
+        try
+        {
+            var result = await DialogService.OpenAsync<ProductForm>("Edit Product",
+            new Dictionary<string, object> { { "ProductId", product.ProductId } },
+            new DialogOptions() { Width = "800px", Height = "700px", Resizable = true, Draggable = true });
+
+            if (result == true)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Product updated successfully");
+                await LoadProducts();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to edit product: {ex.Message}");
+        }
+    }
+
+    async Task DeleteProduct(Product product)
+    {
+        try
+        {
+            var confirm = await DialogService.Confirm($"Are you sure you want to delete {product.Name}?", "Delete Product",
+            new ConfirmOptions() { OkButtonText = "Yes", CancelButtonText = "No" });
+
+            if (confirm == true)
+            {
+                await ProductService.DeleteProductAsync(product.ProductId);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Product deleted");
+                await LoadProducts();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to delete product: {ex.Message}");
+        }
+    }
+}

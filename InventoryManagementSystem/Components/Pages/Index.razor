@@ -1,0 +1,139 @@
+﻿@page "/"
+@using InventoryManagementSystem.Services
+@using InventoryManagementSystem.Models
+@using Radzen
+@using Radzen.Blazor
+
+@inject IProductService ProductService
+@inject IStockTransactionService TransactionService
+
+<RadzenText TextStyle="TextStyle.H4" Text="Dashboard" Class="mb-4" />
+
+@if (isLoading)
+{
+     <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+}
+else
+{
+    <RadzenRow>
+        <RadzenColumn Size="3">
+            <RadzenCard>
+                <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenText TextStyle="TextStyle.H6">Total Products</RadzenText>
+                    <RadzenText TextStyle="TextStyle.DisplayH4" Class="rz-color-primary">@totalProducts</RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="3">
+            <RadzenCard>
+                <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenText TextStyle="TextStyle.H6">Low Stock Items</RadzenText>
+                    <RadzenText TextStyle="TextStyle.DisplayH4" Class="rz-color-warning">@lowStockCount</RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="3">
+            <RadzenCard>
+                <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenText TextStyle="TextStyle.H6">Stock Value</RadzenText>
+                    <RadzenText TextStyle="TextStyle.DisplayH4" Class="rz-color-success">@totalValue.ToString("C0")</RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="3">
+            <RadzenCard>
+                 <RadzenStack AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenText TextStyle="TextStyle.H6">Recent Txns</RadzenText>
+                    <RadzenText TextStyle="TextStyle.DisplayH4" Class="rz-color-info">@recentTransactions.Count</RadzenText>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow Class="mt-4">
+        <RadzenColumn Size="6">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.H6" Class="mb-3">Low Stock Alerts</RadzenText>
+                @if (lowStockProducts.Any())
+                {
+                    <RadzenDataGrid Data="@lowStockProducts" TItem="Product" AllowPaging="true" PageSize="5">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="Product" Property="Name" Title="Product" />
+                            <RadzenDataGridColumn TItem="Product" Property="Quantity" Title="Stock" Width="80px" TextAlign="TextAlign.Center">
+                                 <Template Context="p">
+                                     <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="@($"{p.Quantity}")" />
+                                 </Template>
+                            </RadzenDataGridColumn>
+                             <RadzenDataGridColumn TItem="Product" Property="MinimumStock" Title="Min" Width="80px" TextAlign="TextAlign.Center" />
+                        </Columns>
+                    </RadzenDataGrid>
+                }
+                else
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Success" Variant="Variant.Flat" Shade="Shade.Lighter">All stocks are healthy.</RadzenAlert>
+                }
+            </RadzenCard>
+        </RadzenColumn>
+
+         <RadzenColumn Size="6">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.H6" Class="mb-3">Recent Transactions</RadzenText>
+                @if (recentTransactions.Any())
+                {
+                    <RadzenDataGrid Data="@recentTransactions" TItem="StockTransaction" AllowPaging="true" PageSize="5">
+                        <Columns>
+                             <RadzenDataGridColumn TItem="StockTransaction" Property="Product.Name" Title="Product" />
+                             <RadzenDataGridColumn TItem="StockTransaction" Property="Type" Title="Type" Width="100px">
+                                 <Template Context="t">
+                                     <RadzenBadge BadgeStyle="@GetBadge(t.Type)" Text="@t.Type.ToString()" />
+                                 </Template>
+                             </RadzenDataGridColumn>
+                              <RadzenDataGridColumn TItem="StockTransaction" Property="Quantity" Title="Qty" Width="80px" />
+                               <RadzenDataGridColumn TItem="StockTransaction" Property="TransactionDate" Title="Date" FormatString="{0:MM/dd}" Width="80px" />
+                        </Columns>
+                    </RadzenDataGrid>
+                }
+                else
+                {
+                     <RadzenText TextStyle="TextStyle.Body2">No recent transactions.</RadzenText>
+                }
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+}
+
+@code {
+    bool isLoading = true;
+    int totalProducts;
+    int lowStockCount;
+    decimal totalValue;
+    List<Product> lowStockProducts = new();
+    List<StockTransaction> recentTransactions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        
+        var allProducts = await ProductService.GetAllProductsAsync();
+        totalProducts = allProducts.Count;
+        totalValue = allProducts.Sum(p => p.Price * p.Quantity);
+        
+        lowStockProducts = await ProductService.GetLowStockProductsAsync();
+        lowStockCount = lowStockProducts.Count;
+        
+        recentTransactions = await TransactionService.GetRecentTransactionsAsync(10);
+        
+        isLoading = false;
+    }
+
+    BadgeStyle GetBadge(TransactionType type)
+    {
+         return type switch
+        {
+            TransactionType.StockIn => BadgeStyle.Success,
+            TransactionType.StockOut => BadgeStyle.Danger,
+            TransactionType.Adjustment => BadgeStyle.Warning,
+            _ => BadgeStyle.Light
+        };
+    }
+}

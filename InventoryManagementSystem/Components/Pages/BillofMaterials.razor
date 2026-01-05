@@ -1,0 +1,293 @@
+﻿@page "/bom"
+@using InventoryManagementSystem.Models
+@using InventoryManagementSystem.Services
+@using Radzen
+@using Radzen.Blazor
+
+@inject IProductService ProductService
+@inject IBillOfMaterialsService BOMService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<RadzenStack Gap="1.5rem">
+    <!-- Header Section -->
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="8">
+            <RadzenText TextStyle="TextStyle.H4" Style="margin: 0; font-weight: 600; color: #1976D2;">
+                Bill of Materials (BOM)
+            </RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" Class="rz-color-secondary-text" Style="margin-top: 0.25rem;">
+                Define the raw material structure for finished products. This is used setup and does not affect
+                inventory.
+            </RadzenText>
+        </RadzenColumn>
+        <RadzenColumn Size="4" Class="rz-text-align-right">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton Icon="refresh" Text="Refresh" Click="@LoadData" ButtonStyle="ButtonStyle.Light"
+                    Size="ButtonSize.Medium" />
+                <RadzenButton Icon="add" Text="Create New BOM" Click="@ShowCreateBOM" ButtonStyle="ButtonStyle.Primary"
+                    Size="ButtonSize.Medium" />
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <!-- Search Bar -->
+    <RadzenTextBox Placeholder="Search finished products..." @bind-Value="@searchText"
+        @oninput="@(args => OnSearch(args.Value?.ToString() ?? string.Empty))" Style="width: 100%; max-width: 500px;"
+        class="rz-border-radius-4" />
+
+    <!-- Total Products with BOMs Badge -->
+    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"Total Products with BOM: {filteredProductsWithBOM.Count}")"
+        Shade="Shade.Light" Style="font-size: 0.875rem; padding: 0.5rem 1rem;" />
+
+    <!-- BOM Cards Grid -->
+    @if (isLoading)
+    {
+        <RadzenProgressBarCircular ShowValue="true" Mode="ProgressBarMode.Indeterminate"
+            Size="ProgressBarCircularSize.Large">
+            <Template>Loading...</Template>
+        </RadzenProgressBarCircular>
+    }
+    else if (!filteredProductsWithBOM.Any())
+    {
+        <RadzenCard Style="padding: 3rem; text-align: center;">
+            <RadzenIcon Icon="inventory_2" Style="font-size: 4rem; opacity: 0.3; color: #9E9E9E;" />
+            <RadzenText TextStyle="TextStyle.H6" Style="margin-top: 1rem; color: #757575;">
+                No Bills of Materials Found
+            </RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" Class="rz-color-secondary-text">
+                @if (string.IsNullOrWhiteSpace(searchText))
+                {
+                    <text>Click "Create New BOM" to get started.</text>
+                }
+                else
+                {
+                    <text>No products match your search criteria.</text>
+                }
+            </RadzenText>
+        </RadzenCard>
+    }
+    else
+    {
+        <RadzenRow>
+            @foreach (var product in pagedProducts)
+            {
+                var bomCount = allBOMs.Count(b => b.FinishedProductId == product.ProductId);
+                var estimatedCost = GetEstimatedCost(product.ProductId);
+
+                <RadzenColumn Size="12" SizeMD="6" SizeLG="4">
+                    <RadzenCard
+                        Style="height: 100%; border-left: 4px solid #2196F3; transition: all 0.3s ease; cursor: pointer;"
+                        @onclick="@(() => EditBOM(product))" class="bom-card">
+                        <RadzenStack Gap="0.75rem">
+                            <!-- Product Name & SKU -->
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center"
+                                JustifyContent="JustifyContent.SpaceBetween">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" Style="font-weight: 600; margin: 0; flex: 1;">
+                                    @product.Name
+                                </RadzenText>
+                            </RadzenStack>
+
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@product.SKU" Variant="Variant.Flat" />
+                                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="@product.ProductType.ToString()"
+                                    Variant="Variant.Flat" />
+                            </RadzenStack>
+
+                            <!-- Details -->
+                            <RadzenStack Gap="0.25rem">
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center">
+                                    <RadzenIcon Icon="category" Style="font-size: 1rem; opacity: 0.7;" />
+                                    <RadzenText TextStyle="TextStyle.Body2" Style="margin-left: 0.5rem;">
+                                        <strong>Category:</strong> @(product.Category?.Name ?? "N/A")
+                                    </RadzenText>
+                                </RadzenStack>
+
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center">
+                                    <RadzenIcon Icon="inventory" Style="font-size: 1rem; opacity: 0.7;" />
+                                    <RadzenText TextStyle="TextStyle.Body2" Style="margin-left: 0.5rem;">
+                                        <strong>Stock Status:</strong> @product.Quantity units
+                                    </RadzenText>
+                                </RadzenStack>
+
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center">
+                                    <RadzenIcon Icon="attach_money" Style="font-size: 1rem; opacity: 0.7;" />
+                                    <RadzenText TextStyle="TextStyle.Body2" Style="margin-left: 0.5rem;">
+                                        <strong>BOM Cost:</strong> @estimatedCost.ToString("C")
+                                    </RadzenText>
+                                </RadzenStack>
+
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center">
+                                    <RadzenIcon Icon="list_alt" Style="font-size: 1rem; opacity: 0.7;" />
+                                    <RadzenText TextStyle="TextStyle.Body2" Style="margin-left: 0.5rem;">
+                                        <strong>Contains:</strong> @bomCount @(bomCount == 1 ? "item" : "items")
+                                    </RadzenText>
+                                </RadzenStack>
+                            </RadzenStack>
+
+                            <!-- Action Buttons -->
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                                <RadzenButton Text="Edit BOM" Icon="edit" ButtonStyle="ButtonStyle.Primary"
+                                    Size="ButtonSize.Small" Style="flex: 1;" Click="@(() => EditBOM(product))"
+                                    @onclick:stopPropagation="true" />
+                                <RadzenButton Text="Delete BOM" Icon="delete" ButtonStyle="ButtonStyle.Danger"
+                                    Size="ButtonSize.Small" Variant="Variant.Outlined" Style="flex: 1;"
+                                    Click="@(() => DeleteBOM(product))" @onclick:stopPropagation="true" />
+                            </RadzenStack>
+                        </RadzenStack>
+                    </RadzenCard>
+                </RadzenColumn>
+            }
+        </RadzenRow>
+        <RadzenPager ShowPagingSummary="true" PagingSummaryFormat="@pagingSummaryFormat"
+            HorizontalAlign="HorizontalAlign.Right" Count="@filteredProductsWithBOM.Count" PageSize="@pageSize"
+            PageNumbersCount="5" PageChanged="@OnPage" />
+    }
+</RadzenStack>
+
+<style>
+    .bom-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+    }
+</style>
+
+@code {
+    List<Product> productsWithBOM = new();
+    List<Product> filteredProductsWithBOM = new();
+
+    // Pagination fields
+    IEnumerable<Product> pagedProducts = new List<Product>();
+    int pageSize = 9;
+    string pagingSummaryFormat = "Displaying page {0} of {1} (total {2} records)";
+
+    List<BillOfMaterials> allBOMs = new();
+    bool isLoading = true;
+    string searchText = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        try
+        {
+            isLoading = true;
+            allBOMs = await BOMService.GetAllBOMsAsync();
+            var bomProductIds = allBOMs.Select(b => b.FinishedProductId).Distinct().ToList();
+
+            var allProducts = await ProductService.GetAllProductsAsync();
+            productsWithBOM = allProducts.Where(p => bomProductIds.Contains(p.ProductId)).ToList();
+            filteredProductsWithBOM = productsWithBOM;
+
+            // Initial Page
+            OnPage(new PagerEventArgs { Skip = 0, Top = pageSize });
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load BOMs: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    void OnSearch(string value)
+    {
+        searchText = value;
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            filteredProductsWithBOM = productsWithBOM;
+        }
+        else
+        {
+            filteredProductsWithBOM = productsWithBOM.Where(p =>
+            p.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+            p.SKU.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+            (p.Category?.Name ?? "").Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            ).ToList();
+        }
+
+        // Return to first page on search
+        OnPage(new PagerEventArgs { Skip = 0, Top = pageSize });
+    }
+
+    void OnPage(PagerEventArgs args)
+    {
+        pagedProducts = filteredProductsWithBOM.Skip(args.Skip).Take(args.Top).ToList();
+    }
+
+    decimal GetEstimatedCost(int productId)
+    {
+        var boms = allBOMs.Where(b => b.FinishedProductId == productId);
+        return boms.Sum(b => (b.RawMaterial?.PurchasePrice ?? 0) * b.QuantityRequired);
+    }
+
+    async Task EditBOM(Product product)
+    {
+        try
+        {
+            var result = await DialogService.OpenAsync<BOMCreationDialog>($"Edit BOM: {product.Name}",
+            new Dictionary<string, object> { { "ProductId", product.ProductId } },
+            new DialogOptions() { Width = "900px", Height = "auto", Resizable = true, Draggable = true });
+
+            if (result is bool success && success)
+            {
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to open BOM editor: {ex.Message}");
+        }
+    }
+
+    async Task ShowCreateBOM()
+    {
+        try
+        {
+            var result = await DialogService.OpenAsync<BOMCreationDialog>("Create New Bill of Materials",
+            new Dictionary<string, object>(),
+            new DialogOptions() { Width = "900px", Height = "auto", Resizable = true, Draggable = true });
+
+            if (result is bool success && success)
+            {
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to open BOM creator: {ex.Message}");
+        }
+    }
+
+    async Task DeleteBOM(Product product)
+    {
+        var confirm = await DialogService.Confirm(
+        $"Are you sure you want to delete the Bill of Materials for '{product.Name}'? This action cannot be undone.",
+        "Delete BOM",
+        new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
+
+        if (confirm == true)
+        {
+            try
+            {
+                var boms = await BOMService.GetBOMByProductIdAsync(product.ProductId);
+                foreach (var bom in boms)
+                {
+                    await BOMService.DeleteBOMAsync(bom.BOMId);
+                }
+
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Bill of Materials deleted successfully!");
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to delete BOM: {ex.Message}");
+            }
+        }
+    }
+}

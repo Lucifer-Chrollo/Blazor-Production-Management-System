@@ -1,0 +1,10 @@
+﻿D:\Computer network\InventoryManagementSystem\InventoryManagementSystem\Components\Pages\WorkOrderDialog.razor(46,38): error CS1503: Argument 2: cannot convert from 'method group' to 'Microsoft.AspNetCore.Components.EventCallback' [D:\Computer network\InventoryManagementSystem\InventoryManagementSystem\InventoryManagementSystem.csproj]
+D:\Computer network\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\net10.0\Microsoft.CodeAnalysis.Razor.Compiler\Microsoft.NET.Sdk.Razor.SourceGenerators.RazorSourceGenerator\Components_Pages_WorkOrderDialog_razor.g.cs(129,228): error CS1662: Cannot convert lambda expression to intended delegate type because some of the return types in the block are not implicitly convertible to the delegate return type [D:\Computer network\InventoryManagementSystem\InventoryManagementSystem\InventoryManagementSystem.csproj]
+D:\Computer network\InventoryManagementSystem\InventoryManagementSystem\Components\Pages\ProductForm.razor(72,54): error CS1503: Argument 2: cannot convert from 'method group' to 'Microsoft.AspNetCore.Components.EventCallback' [D:\Computer network\InventoryManagementSystem\InventoryManagementSystem\InventoryManagementSystem.csproj]
+D:\Computer network\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\net10.0\Microsoft.CodeAnalysis.Razor.Compiler\Microsoft.NET.Sdk.Razor.SourceGenerators.RazorSourceGenerator\Components_Pages_ProductForm_razor.g.cs(129,224): error CS1662: Cannot convert lambda expression to intended delegate type because some of the return types in the block are not implicitly convertible to the delegate return type [D:\Computer network\InventoryManagementSystem\InventoryManagementSystem\InventoryManagementSystem.csproj]
+
+Build FAILED.
+    15 Warning(s)
+    4 Error(s)
+
+Time Elapsed 00:00:03.03

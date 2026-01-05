@@ -1,0 +1,163 @@
+﻿@page "/categories"
+@using InventoryManagementSystem.Models
+@using InventoryManagementSystem.Services
+@using Radzen
+@using Radzen.Blazor
+
+@inject ICategoryService CategoryService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<RadzenStack>
+    <RadzenRow AlignItems="AlignItems.Center">
+        <RadzenColumn Size="6">
+            <RadzenText TextStyle="TextStyle.H4" Text="Categories" />
+        </RadzenColumn>
+        <RadzenColumn Size="6" Class="rz-text-align-right">
+            <RadzenButton Icon="add" Text="Add Category" Click="@InsertRow" ButtonStyle="ButtonStyle.Primary" />
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenDataGrid @ref="grid" Data="@categories" TItem="Category" AllowFiltering="true" AllowPaging="true"
+        AllowSorting="true" EditMode="DataGridEditMode.Single" RowUpdate="@OnUpdateRow" RowCreate="@OnCreateRow"
+        IsLoading="@isLoading">
+        <Columns>
+            <RadzenDataGridColumn TItem="Category" Property="CategoryId" Title="ID" Width="60px" />
+
+            <RadzenDataGridColumn TItem="Category" Property="Name" Title="Name">
+                <EditTemplate Context="category">
+                    <RadzenTextBox @bind-Value="category.Name" Style="width:100%;" Name="Name" />
+                    <RadzenRequiredValidator Text="Name is required" Component="Name" Popup="true" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="Category" Property="Description" Title="Description">
+                <EditTemplate Context="category">
+                    <RadzenTextBox @bind-Value="category.Description" Style="width:100%;" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="Category" Property="CreatedDate" Title="Created" FormatString="{0:d}"
+                Width="120px">
+                <EditTemplate Context="category">
+                    <RadzenText>@category.CreatedDate.ToShortDateString()</RadzenText>
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="Category" Title="Actions" Width="120px" Sortable="false" Filterable="false">
+                <Template Context="category">
+                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Medium"
+                        Click="@(args => EditRow(category))" @onclick:stopPropagation="true" />
+                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Medium"
+                        Click="@(args => DeleteRow(category))" @onclick:stopPropagation="true" />
+                </Template>
+                <EditTemplate Context="category">
+                    <RadzenButton Icon="check" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Medium"
+                        Click="@((args) => SaveRow(category))" />
+                    <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Medium"
+                        Click="@((args) => CancelEdit(category))" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenStack>
+
+@code {
+    List<Category> categories = new();
+    RadzenDataGrid<Category>? grid;
+    bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        try
+        {
+            isLoading = true;
+            categories = await CategoryService.GetAllCategoriesAsync();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to load categories: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    async Task InsertRow()
+    {
+        var category = new Category { CreatedDate = DateTime.Now };
+        await grid.InsertRow(category);
+    }
+
+    async Task EditRow(Category category)
+    {
+        await grid.EditRow(category);
+    }
+
+    async Task SaveRow(Category category)
+    {
+        await grid.UpdateRow(category);
+    }
+
+    void CancelEdit(Category category)
+    {
+        grid.CancelEditRow(category);
+    }
+
+    async Task DeleteRow(Category category)
+    {
+        try
+        {
+            var confirm = await DialogService.Confirm("Are you sure?", "Delete Category", new ConfirmOptions()
+                {
+                    OkButtonText =
+                "Yes",
+                    CancelButtonText = "No"
+                });
+            if (confirm == true)
+            {
+                await CategoryService.DeleteCategoryAsync(category.CategoryId);
+                await LoadData();
+                NotificationService.Notify(NotificationSeverity.Success, "Deleted", "Category deleted");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to delete category: {ex.Message}");
+        }
+    }
+
+    async Task OnCreateRow(Category category)
+    {
+        try
+        {
+            await CategoryService.AddCategoryAsync(category);
+            await LoadData();
+            NotificationService.Notify(NotificationSeverity.Success, "Success", "Category added");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to create category: {ex.Message}");
+        }
+    }
+
+    async Task OnUpdateRow(Category category)
+    {
+        try
+        {
+            await CategoryService.UpdateCategoryAsync(category);
+            // No need to reload as object is updated in memory by Grid, but good practice to sync.
+            NotificationService.Notify(NotificationSeverity.Success, "Success", "Category updated");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to update category: {ex.Message}");
+        }
+    }
+}
