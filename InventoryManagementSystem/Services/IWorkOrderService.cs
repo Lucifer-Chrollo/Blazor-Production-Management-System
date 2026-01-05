@@ -1,4 +1,5 @@
 ﻿using InventoryManagementSystem.Models;
+using Radzen;
 
 namespace InventoryManagementSystem.Services
 {
@@ -15,5 +16,7 @@ namespace InventoryManagementSystem.Services
         Task<List<WorkOrderDetailViewModel>> GetWorkOrderDetailsAsync(int productId, int quantity);
         Task<decimal> CalculateTotalCostAsync(int productId, int quantity);
         Task RecalculateHistoricalCostsAsync();
+        event Action OnChange;
+        event Action<string, Radzen.NotificationSeverity> OnSystemNotification;
     }
 }

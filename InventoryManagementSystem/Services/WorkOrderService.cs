@@ -1,5 +1,6 @@
 ﻿using InventoryManagementSystem.Models;
 using System.Transactions;
+using Radzen;
 
 namespace InventoryManagementSystem.Services
 {
@@ -59,6 +60,7 @@ namespace InventoryManagementSystem.Services
                 SELECT CAST(SCOPE_IDENTITY() as int)";
 
             workOrder.WorkOrderId = await _db.ExecuteScalarAsync<int>(sql, workOrder);
+            NotifyStateChanged();
             return workOrder;
         }
 
@@ -76,12 +78,14 @@ namespace InventoryManagementSystem.Services
                 WHERE WorkOrderId = @WorkOrderId";
 
             await _db.ExecuteAsync(sql, workOrder);
+            NotifyStateChanged();
             return workOrder;
         }
 
         public async Task<bool> DeleteWorkOrderAsync(int id)
         {
             var rows = await _db.ExecuteAsync("DELETE FROM WorkOrders WHERE WorkOrderId = @Id", new { Id = id });
+            NotifyStateChanged();
             return rows > 0;
         }
 
@@ -186,7 +190,11 @@ namespace InventoryManagementSystem.Services
 
                 await UpdateWorkOrderAsync(workOrder);
 
+                await UpdateWorkOrderAsync(workOrder);
+
                 scope.Complete();
+
+                NotifySystem($"Work Order #{workOrder.OrderNumber} completed successfully!", Radzen.NotificationSeverity.Success);
             }
 
             return workOrder;
@@ -293,5 +301,11 @@ namespace InventoryManagementSystem.Services
                 }
             }
         }
+
+        public event Action OnChange;
+        public event Action<string, Radzen.NotificationSeverity> OnSystemNotification;
+
+        private void NotifyStateChanged() => OnChange?.Invoke();
+        private void NotifySystem(string message, Radzen.NotificationSeverity severity) => OnSystemNotification?.Invoke(message, severity);
     }
 }

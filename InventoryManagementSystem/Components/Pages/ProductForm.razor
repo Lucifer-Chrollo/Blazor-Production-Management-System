@@ -35,15 +35,15 @@
                         <RadzenRow>
                             <RadzenColumn Size="6">
                                 <RadzenStack Gap="1rem">
-                                    @if(product.ProductType != ProductType.Finished)
+                                    @if (product.ProductType != ProductType.Finished)
                                     {
-                                        <RadzenFormField Text="Category" Variant="Variant.Outlined" Style="width: 100%">
-                                            <RadzenDropDown @bind-Value="@product.CategoryId" Data="@categories"
-                                                TextProperty="Name" ValueProperty="CategoryId" Name="Category"
-                                                Style="width: 100%" />
-                                        </RadzenFormField>
-                                        <RadzenRequiredValidator Component="Category" Text="Category is required"
-                                            DefaultValue="0" />
+                                            <RadzenFormField Text="Category" Variant="Variant.Outlined" Style="width: 100%">
+                                                <RadzenDropDown @bind-Value="@product.CategoryId" Data="@categories"
+                                                    TextProperty="Name" ValueProperty="CategoryId" Name="Category"
+                                                    Style="width: 100%" />
+                                            </RadzenFormField>
+                                            <RadzenRequiredValidator Component="Category" Text="Category is required"
+                                                DefaultValue="0" />
                                     }
 
                                     <RadzenFormField Text="Supplier" Variant="Variant.Outlined" Style="width: 100%">
@@ -52,14 +52,17 @@
                                             Style="width: 100%" />
                                     </RadzenFormField>
 
-                                    <RadzenFormField Text="Description" Variant="Variant.Outlined" Style="width: 100%">
-                                        <RadzenTextArea @bind-Value="@product.Description" Rows="3"
+                                    <RadzenFormField Text="SKU" Variant="Variant.Outlined" Style="width: 100%">
+                                        <RadzenTextBox @bind-Value="@product.SKU" Placeholder="Auto-generated if empty"
                                             Style="width: 100%" />
                                     </RadzenFormField>
 
-                                    <RadzenFormField Text="Quantity" Variant="Variant.Outlined" Style="width: 100%">
-                                        <RadzenNumeric @bind-Value="@product.Quantity" Name="Quantity"
-                                            Style="width: 100%" />
+                                    <RadzenFormField Text="Model" Variant="Variant.Outlined" Style="width: 100%">
+                                        <RadzenTextBox @bind-Value="@product.ProductModel" Style="width: 100%" />
+                                    </RadzenFormField>
+
+                                    <RadzenFormField Text="Location" Variant="Variant.Outlined" Style="width: 100%">
+                                        <RadzenTextBox @bind-Value="@product.Location" Style="width: 100%" />
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenColumn>
@@ -72,35 +75,26 @@
                                     </RadzenFormField>
 
                                     <RadzenFormField Text="Sale Price" Variant="Variant.Outlined" Style="width: 100%">
-                                        <RadzenNumeric @bind-Value="@product.SalePrice" Format="c" Style="width: 100%"
-                                            Change="@((decimal args) => CalculateGST(args))" />
+                                        <RadzenNumeric @bind-Value="@product.SalePrice" Format="c" Style="width: 100%" />
                                     </RadzenFormField>
 
-                                    <RadzenFormField Text="Sale Price (Inc. GST)" Variant="Variant.Outlined"
-                                        Style="width: 100%">
-                                        <RadzenNumeric @bind-Value="@product.SalePriceWithGST" Format="c"
-                                            ReadOnly="true" Style="width: 100%; background-color: #f0f0f0;" />
+                                    <RadzenFormField Text="Quantity" Variant="Variant.Outlined" Style="width: 100%">
+                                        <RadzenNumeric @bind-Value="@product.Quantity" Name="Quantity"
+                                            Style="width: 100%" />
                                     </RadzenFormField>
 
-                                    <RadzenFormField Text="Location" Variant="Variant.Outlined" Style="width: 100%">
-                                        <RadzenTextBox @bind-Value="@product.Location" Style="width: 100%" />
-                                    </RadzenFormField>
-                                    <RadzenFormField Text="Model" Variant="Variant.Outlined" Style="width: 100%">
-                                        <RadzenTextBox @bind-Value="@product.ProductModel" Style="width: 100%" />
+                                    <RadzenFormField Text="Min Stock" Variant="Variant.Outlined" Style="width: 100%">
+                                        <RadzenNumeric @bind-Value="@product.MinimumStock" Style="width: 100%" />
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenColumn>
                         </RadzenRow>
+
                         <RadzenRow>
-                            <RadzenColumn Size="6">
-                                <RadzenFormField Text="SKU" Variant="Variant.Outlined" Style="width: 100%">
-                                    <RadzenTextBox @bind-Value="@product.SKU" Placeholder="Auto-generated if empty"
+                            <RadzenColumn Size="12">
+                                <RadzenFormField Text="Description" Variant="Variant.Outlined" Style="width: 100%">
+                                    <RadzenTextArea @bind-Value="@product.Description" Rows="3"
                                         Style="width: 100%" />
-                                </RadzenFormField>
-                            </RadzenColumn>
-                            <RadzenColumn Size="6">
-                                <RadzenFormField Text="Min Stock" Variant="Variant.Outlined" Style="width: 100%">
-                                    <RadzenNumeric @bind-Value="@product.MinimumStock" Style="width: 100%" />
                                 </RadzenFormField>
                             </RadzenColumn>
                         </RadzenRow>
@@ -108,148 +102,148 @@
                 </RadzenTabsItem>
                 @if (product.ProductType == ProductType.Finished)
                 {
-                    <RadzenTabsItem Text="Bill of Materials">
-                        <RadzenStack Gap="1rem" Class="mt-2">
+                        <RadzenTabsItem Text="Bill of Materials">
+                            <RadzenStack Gap="1rem" Class="mt-2">
 
-                            <!-- Product Details Section -->
-                            <RadzenRow>
-                                <RadzenColumn Size="12">
-                                    <RadzenText TextStyle="TextStyle.H5" Text="Production Details" />
-                                </RadzenColumn>
-                            </RadzenRow>
-
-                            <RadzenRow>
-                                <RadzenColumn Size="6">
-                                    <RadzenDropDown @bind-Value="filterBOMCategoryId" 
-                                                    Data="@(categories)" 
-                                                    TextProperty="Name"
-                                                    ValueProperty="CategoryId"
-                                                    Placeholder="Select Category"
-                                                    AllowClear="true"
-                                                    Change="@(args => OnBOMCategoryChange())"
-                                                    Style="width: 100%" />
-                                </RadzenColumn>
-
-                                <RadzenColumn Size="6">
-                                    <RadzenAutoComplete Data="@filteredCopyRecipeProducts" 
-                                            TextProperty="Name" 
-                                            LoadData="@OnLoadCopyRecipe"
-                                            Change="@OnCopyRecipeChange"
-                                            @bind-Value="@copyRecipeSearchText"
-                                            Placeholder="Search existing product recipe..."
-                                            Style="width: 100%;" 
-                                            Name="CopyRecipe"
-                                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive">
-                                            <Template Context="prod">
-                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                    <RadzenText TextStyle="TextStyle.Body1" Style="margin: 0; font-weight: 500;">@prod.Name</RadzenText>
-                                                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@prod.SKU" Variant="Variant.Flat" />
-                                                </RadzenStack>
-                                            </Template>
-                                    </RadzenAutoComplete>
-                                </RadzenColumn>
-                            </RadzenRow>
-
-                            <!-- Materials and Recipe Table -->
-                            <RadzenCard Variant="Variant.Flat" Class="rz-p-3" Style="background-color: #f8f9fa; border: 1px solid #dee2e6;">
-                                <RadzenRow AlignItems="AlignItems.End">
-                                    <RadzenColumn Size="6">
-                                        <RadzenLabel Text="Raw Material" Component="RawMat" />
-                                        <RadzenAutoComplete Data="@filteredRawMaterials" 
-                                            TextProperty="Name" 
-                                            LoadData="@OnLoadRawMaterials"
-                                            Change="@OnRawMaterialChange"
-                                            @bind-Value="@rawMaterialSearchText"
-                                            Placeholder="Search by Name or SKU..."
-                                            Style="width: 100%" 
-                                            Name="RawMat"
-                                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive">
-                                            <Template Context="prod">
-                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                    <RadzenText TextStyle="TextStyle.Body1" Style="margin: 0; font-weight: 500;">@prod.Name</RadzenText>
-                                                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@prod.SKU" Variant="Variant.Flat" />
-                                                </RadzenStack>
-                                                <RadzenText TextStyle="TextStyle.Caption" Class="rz-color-secondary-text" Style="margin: 0;">
-                                                    Stock: @prod.Quantity | @prod.Category?.Name
-                                                </RadzenText>
-                                            </Template>
-                                        </RadzenAutoComplete>
-                                    </RadzenColumn>
-                                    <RadzenColumn Size="3">
-                                        <RadzenLabel Text="Quantity" Component="Qty" />
-                                        <RadzenNumeric @bind-Value="@newBOMQty" Name="Qty" Min="@(0.01m)" TValue="decimal" Style="width: 100%" />
-                                    </RadzenColumn>
-                                    <RadzenColumn Size="2">
-                                        <RadzenLabel Text="Unit" Component="Unit" />
-                                        <RadzenTextBox @bind-Value="@newBOMUnit" Name="Unit" Style="width: 100%" />
-                                    </RadzenColumn>
-                                    <RadzenColumn Size="1">
-                                        <RadzenButton Text="Add" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@AddBOMItem" Style="width: 100%" />
+                                <!-- Product Details Section -->
+                                <RadzenRow>
+                                    <RadzenColumn Size="12">
+                                        <RadzenText TextStyle="TextStyle.H5" Text="Production Details" />
                                     </RadzenColumn>
                                 </RadzenRow>
-                            </RadzenCard>
 
-                            <RadzenDataGrid @ref="bomGrid" Data="@bomItems" TItem="BillOfMaterials" AllowPaging="true" PageSize="5" Density="Density.Compact" GridLines="DataGridGridLines.Horizontal">
-                                <Columns>
-                                    <RadzenDataGridColumn TItem="BillOfMaterials" Title="Material">
-                                        <Template Context="item">
-                                            <span style="font-weight: 500;">@GetRawMaterialName(item.RawMaterialId)</span>
-                                        </Template>
-                                    </RadzenDataGridColumn>
-                                    <RadzenDataGridColumn TItem="BillOfMaterials" Property="QuantityRequired" Title="Qty" Width="100px">
-                                        <EditTemplate Context="item">
-                                            <RadzenNumeric @bind-Value="item.QuantityRequired" Style="width: 100%" />
-                                        </EditTemplate>
-                                    </RadzenDataGridColumn>
-                                    <RadzenDataGridColumn TItem="BillOfMaterials" Property="Unit" Title="Unit" Width="80px" />
-                                    <RadzenDataGridColumn TItem="BillOfMaterials" Title="Cost" Width="120px">
-                                        <Template Context="item">
+                                <RadzenRow>
+                                    <RadzenColumn Size="6">
+                                        <RadzenDropDown @bind-Value="filterBOMCategoryId" 
+                                                        Data="@(categories)" 
+                                                        TextProperty="Name"
+                                                        ValueProperty="CategoryId"
+                                                        Placeholder="Select Category"
+                                                        AllowClear="true"
+                                                        Change="@(args => OnBOMCategoryChange())"
+                                                        Style="width: 100%" />
+                                    </RadzenColumn>
+
+                                    <RadzenColumn Size="6">
+                                        <RadzenAutoComplete Data="@filteredCopyRecipeProducts" 
+                                                TextProperty="Name" 
+                                                LoadData="@OnLoadCopyRecipe"
+                                                Change="@OnCopyRecipeChange"
+                                                @bind-Value="@copyRecipeSearchText"
+                                                Placeholder="Search existing product recipe..."
+                                                Style="width: 100%;" 
+                                                Name="CopyRecipe"
+                                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive">
+                                                <Template Context="prod">
+                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                        <RadzenText TextStyle="TextStyle.Body1" Style="margin: 0; font-weight: 500;">@prod.Name</RadzenText>
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@prod.SKU" Variant="Variant.Flat" />
+                                                    </RadzenStack>
+                                                </Template>
+                                        </RadzenAutoComplete>
+                                    </RadzenColumn>
+                                </RadzenRow>
+
+                                <!-- Materials and Recipe Table -->
+                                <RadzenCard Variant="Variant.Flat" Class="rz-p-3" Style="background-color: #f8f9fa; border: 1px solid #dee2e6;">
+                                    <RadzenRow AlignItems="AlignItems.End">
+                                        <RadzenColumn Size="6">
+                                            <RadzenLabel Text="Raw Material" Component="RawMat" />
+                                            <RadzenAutoComplete Data="@filteredRawMaterials" 
+                                                TextProperty="Name" 
+                                                LoadData="@OnLoadRawMaterials"
+                                                Change="@OnRawMaterialChange"
+                                                @bind-Value="@rawMaterialSearchText"
+                                                Placeholder="Search by Name or SKU..."
+                                                Style="width: 100%" 
+                                                Name="RawMat"
+                                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive">
+                                                <Template Context="prod">
+                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                        <RadzenText TextStyle="TextStyle.Body1" Style="margin: 0; font-weight: 500;">@prod.Name</RadzenText>
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@prod.SKU" Variant="Variant.Flat" />
+                                                    </RadzenStack>
+                                                    <RadzenText TextStyle="TextStyle.Caption" Class="rz-color-secondary-text" Style="margin: 0;">
+                                                        Stock: @prod.Quantity | @prod.Category?.Name
+                                                    </RadzenText>
+                                                </Template>
+                                            </RadzenAutoComplete>
+                                        </RadzenColumn>
+                                        <RadzenColumn Size="3">
+                                            <RadzenLabel Text="Quantity" Component="Qty" />
+                                            <RadzenNumeric @bind-Value="@newBOMQty" Name="Qty" Min="@(0.01m)" TValue="decimal" Style="width: 100%" />
+                                        </RadzenColumn>
+                                        <RadzenColumn Size="2">
+                                            <RadzenLabel Text="Unit" Component="Unit" />
+                                            <RadzenTextBox @bind-Value="@newBOMUnit" Name="Unit" Style="width: 100%" />
+                                        </RadzenColumn>
+                                        <RadzenColumn Size="1">
+                                            <RadzenButton Text="Add" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@AddBOMItem" Style="width: 100%" />
+                                        </RadzenColumn>
+                                    </RadzenRow>
+                                </RadzenCard>
+
+                                <RadzenDataGrid @ref="bomGrid" Data="@bomItems" TItem="BillOfMaterials" AllowPaging="true" PageSize="5" Density="Density.Compact" GridLines="DataGridGridLines.Horizontal">
+                                    <Columns>
+                                        <RadzenDataGridColumn TItem="BillOfMaterials" Title="Material">
+                                            <Template Context="item">
+                                                <span style="font-weight: 500;">@GetRawMaterialName(item.RawMaterialId)</span>
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                        <RadzenDataGridColumn TItem="BillOfMaterials" Property="QuantityRequired" Title="Qty" Width="100px">
+                                            <EditTemplate Context="item">
+                                                <RadzenNumeric @bind-Value="item.QuantityRequired" Style="width: 100%" />
+                                            </EditTemplate>
+                                        </RadzenDataGridColumn>
+                                        <RadzenDataGridColumn TItem="BillOfMaterials" Property="Unit" Title="Unit" Width="80px" />
+                                        <RadzenDataGridColumn TItem="BillOfMaterials" Title="Cost" Width="120px">
+                                            <Template Context="item">
                                             @GetMaterialCost(item.RawMaterialId, item.QuantityRequired)
-                                        </Template>
-                                    </RadzenDataGridColumn>
-                                    <RadzenDataGridColumn TItem="BillOfMaterials" Title="Action" Width="80px" Sortable="false">
-                                        <Template Context="item">
-                                            <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger"
-                                                Size="ButtonSize.Small" Click="@(() => RemoveBOMItem(item))" />
-                                        </Template>
-                                    </RadzenDataGridColumn>
-                                </Columns>
-                            </RadzenDataGrid>
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                        <RadzenDataGridColumn TItem="BillOfMaterials" Title="Action" Width="80px" Sortable="false">
+                                            <Template Context="item">
+                                                <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger"
+                                                    Size="ButtonSize.Small" Click="@(() => RemoveBOMItem(item))" />
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                    </Columns>
+                                </RadzenDataGrid>
 
-                            <RadzenRow>
-                                <RadzenColumn Size="12" AlignItems="AlignItems.Center">
-                                    <RadzenText TextStyle="TextStyle.H6" Text="@($"Total Recipe Cost: {GetTotalRecipeCost()}")" />
-                                </RadzenColumn>
-                            </RadzenRow>
+                                <RadzenRow>
+                                    <RadzenColumn Size="12" AlignItems="AlignItems.Center">
+                                        <RadzenText TextStyle="TextStyle.H6" Text="@($"Total Recipe Cost: {GetTotalRecipeCost()}")" />
+                                    </RadzenColumn>
+                                </RadzenRow>
 
-                        </RadzenStack>
-                    </RadzenTabsItem>
+                            </RadzenStack>
+                        </RadzenTabsItem>
                 }
             </Tabs>
         </RadzenTabs>
 
         @if (product.ProductType == ProductType.Finished && product.ProductId > 0)
         {
-            <RadzenCard Variant="Variant.Flat" Class="rz-mt-4 rz-p-3" Style="border: 1px dashed #2196F3; background-color: #E3F2FD;">
-                <RadzenText TextStyle="TextStyle.Subtitle2" Text="Instant Production Run (Optional)" Class="rz-color-primary" Style="font-weight: bold;" />
-                <RadzenText TextStyle="TextStyle.Caption" Text="Enter quantity to immediately produce. This will increase stock and deduct raw materials." />
-                
-                <RadzenRow AlignItems="AlignItems.Center" Class="rz-mt-2">
-                    <RadzenColumn Size="6">
-                        <RadzenFormField Text="Quantity to Produce" Variant="Variant.Outlined" Style="width: 100%">
-                             <RadzenNumeric @bind-Value="@quantityToProduce" Min="0" Step="1" Style="width: 100%" />
-                        </RadzenFormField>
-                    </RadzenColumn>
-                     <RadzenColumn Size="6">
+                <RadzenCard Variant="Variant.Flat" Class="rz-mt-4 rz-p-3" Style="border: 1px dashed #2196F3; background-color: #E3F2FD;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Text="Instant Production Run (Optional)" Class="rz-color-primary" Style="font-weight: bold;" />
+                    <RadzenText TextStyle="TextStyle.Caption" Text="Enter quantity to immediately produce. This will increase stock and deduct raw materials." />
+
+                    <RadzenRow AlignItems="AlignItems.Center" Class="rz-mt-2">
+                        <RadzenColumn Size="6">
+                            <RadzenFormField Text="Quantity to Produce" Variant="Variant.Outlined" Style="width: 100%">
+                                 <RadzenNumeric @bind-Value="@quantityToProduce" Min="0" Step="1" Style="width: 100%" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                         <RadzenColumn Size="6">
                         @if (quantityToProduce > 0)
                         {
-                            <RadzenAlert AlertStyle="AlertStyle.Warning" Variant="Variant.Flat" Shade="Shade.Lighter" Size="AlertSize.Small" AllowClose="false">
-                                Will deduct materials for <strong>@quantityToProduce</strong> units.
-                            </RadzenAlert>
+                                    <RadzenAlert AlertStyle="AlertStyle.Warning" Variant="Variant.Flat" Shade="Shade.Lighter" Size="AlertSize.Small" AllowClose="false">
+                                        Will deduct materials for <strong>@quantityToProduce</strong> units.
+                                    </RadzenAlert>
                         }
-                    </RadzenColumn>
-                </RadzenRow>
-            </RadzenCard>
+                        </RadzenColumn>
+                    </RadzenRow>
+                </RadzenCard>
         }
 
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
@@ -265,11 +259,11 @@
     int quantityToProduce = 0;
 
     Product product = new Product
-    {
-        CreatedDate = DateTime.Now,
-        MinimumStock = 10,
-        ProductType = ProductType.Finished
-    };
+        {
+            CreatedDate = DateTime.Now,
+            MinimumStock = 10,
+            ProductType = ProductType.Finished
+        };
 
     List<Category> categories = new();
     List<Supplier> suppliers = new();
@@ -286,7 +280,7 @@
     // Copy Recipe
     List<Product> filteredCopyRecipeProducts = new List<Product>();
     string copyRecipeSearchText = string.Empty;
-    
+
     decimal newBOMQty = 1;
     string newBOMUnit = "pcs";
     RadzenDataGrid<BillOfMaterials> bomGrid;
@@ -297,7 +291,7 @@
         suppliers = await SupplierService.GetAllSuppliersAsync();
         allProducts = await ProductService.GetAllProductsAsync();
         rawMaterials = allProducts.Where(p => p.ProductType == ProductType.Assembly).ToList();
-        
+
         if (ProductId.HasValue)
         {
             product = await ProductService.GetProductByIdAsync(ProductId.Value) ?? product;
@@ -314,12 +308,6 @@
             bomItems.Clear();
     }
 
-    void CalculateGST(decimal value)
-    {
-        if (product.SalePrice > 0)
-            product.SalePriceWithGST = product.SalePrice * 1.18m;
-    }
-
     void OnBOMCategoryChange()
     {
         if (filterBOMCategoryId.HasValue)
@@ -330,7 +318,7 @@
         {
             filteredRawMaterials = rawMaterials;
         }
-        selectedRawMaterialId = 0; 
+        selectedRawMaterialId = 0;
     }
 
     async Task OnCopyRecipeChange(object value)
@@ -351,10 +339,10 @@
     void OnLoadCopyRecipe(LoadDataArgs args)
     {
         var query = args.Filter ?? string.Empty;
-        filteredCopyRecipeProducts = allProducts.Where(p => 
-            p.ProductType == ProductType.Finished && 
+        filteredCopyRecipeProducts = allProducts.Where(p =>
+            p.ProductType == ProductType.Finished &&
             p.ProductId != product.ProductId &&
-            (p.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || 
+            (p.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
              p.SKU.Contains(query, StringComparison.OrdinalIgnoreCase))
         ).Take(10).ToList();
     }
@@ -363,28 +351,28 @@
     {
         if (productId > 0)
         {
-             var itemsToCopy = await BOMService.GetBOMByProductIdAsync(productId);
-             bomItems.Clear();
-             foreach(var item in itemsToCopy)
-             {
-                 bomItems.Add(new BillOfMaterials 
-                 {
-                     RawMaterialId = item.RawMaterialId,
-                     QuantityRequired = item.QuantityRequired,
-                     Unit = item.Unit,
-                     IsActive = true
-                 });
-             }
-             if(bomGrid != null) await bomGrid.Reload();
-             NotificationService.Notify(NotificationSeverity.Success, "Recipe Copied", "BOM items replaced from selected product.");
+            var itemsToCopy = await BOMService.GetBOMByProductIdAsync(productId);
+            bomItems.Clear();
+            foreach (var item in itemsToCopy)
+            {
+                bomItems.Add(new BillOfMaterials
+                    {
+                        RawMaterialId = item.RawMaterialId,
+                        QuantityRequired = item.QuantityRequired,
+                        Unit = item.Unit,
+                        IsActive = true
+                    });
+            }
+            if (bomGrid != null) await bomGrid.Reload();
+            NotificationService.Notify(NotificationSeverity.Success, "Recipe Copied", "BOM items replaced from selected product.");
         }
     }
 
     void OnLoadRawMaterials(LoadDataArgs args)
     {
         var query = args.Filter ?? string.Empty;
-        filteredRawMaterials = rawMaterials.Where(p => 
-                (p.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || 
+        filteredRawMaterials = rawMaterials.Where(p =>
+                (p.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
                  p.SKU.Contains(query, StringComparison.OrdinalIgnoreCase)) &&
                 (filterBOMCategoryId == null || p.CategoryId == filterBOMCategoryId)
             ).Take(10).ToList();
@@ -480,21 +468,21 @@
         if (string.IsNullOrEmpty(product.SKU))
             product.SKU = $"PRD-{DateTime.Now:yyyyMMddHHmmss}";
 
-        product.Price = product.SalePrice; 
+        product.Price = product.SalePrice;
 
-         // Validate Stock for Production
+        // Validate Stock for Production
         if (quantityToProduce > 0 && product.ProductType == ProductType.Finished)
         {
             foreach (var item in bomItems)
             {
                 var needed = item.QuantityRequired * quantityToProduce;
                 var rawMat = allProducts.FirstOrDefault(p => p.ProductId == item.RawMaterialId);
-                
+
                 if (rawMat != null && rawMat.Quantity < needed)
                 {
-                    NotificationService.Notify(NotificationSeverity.Error, "Insufficient Stock", 
+                    NotificationService.Notify(NotificationSeverity.Error, "Insufficient Stock",
                         $"Need {needed} {item.Unit} of {rawMat.Name}, but only have {rawMat.Quantity}.");
-                    return; 
+                    return;
                 }
             }
         }
@@ -537,29 +525,29 @@
             if (quantityToProduce > 0)
             {
                 // 1. Add Stock to Finished Good
-                await StockTransactionService.AddTransactionAsync(new StockTransaction 
-                { 
-                    ProductId = product.ProductId, 
-                    Type = TransactionType.StockIn, 
-                    Quantity = quantityToProduce, 
-                    TransactionDate = DateTime.Now, 
-                    Notes = "Instant Production from Product Edit" 
-                });
+                await StockTransactionService.AddTransactionAsync(new StockTransaction
+                    {
+                        ProductId = product.ProductId,
+                        Type = TransactionType.StockIn,
+                        Quantity = quantityToProduce,
+                        TransactionDate = DateTime.Now,
+                        Notes = "Instant Production from Product Edit"
+                    });
 
                 // 2. Deduct Raw Materials
                 foreach (var item in bomItems)
                 {
                     var qtyToDeduct = (int)Math.Ceiling(item.QuantityRequired * quantityToProduce);
-                    await StockTransactionService.AddTransactionAsync(new StockTransaction 
-                    { 
-                        ProductId = item.RawMaterialId, 
-                        Type = TransactionType.StockOut, 
-                        Quantity = qtyToDeduct, 
-                        TransactionDate = DateTime.Now, 
-                        Notes = $"Consumed for {product.Name} (Instant Build)" 
-                    });
+                    await StockTransactionService.AddTransactionAsync(new StockTransaction
+                        {
+                            ProductId = item.RawMaterialId,
+                            Type = TransactionType.StockOut,
+                            Quantity = qtyToDeduct,
+                            TransactionDate = DateTime.Now,
+                            Notes = $"Consumed for {product.Name} (Instant Build)"
+                        });
                 }
-                
+
                 NotificationService.Notify(NotificationSeverity.Success, "Production Complete", $"Produced {quantityToProduce} units.");
             }
         }
